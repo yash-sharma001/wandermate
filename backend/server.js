@@ -23,10 +23,25 @@ const wss = new WebSocket.Server({ server });
 const db = require('./config/database');
 
 // Middleware
-app.use(cors());
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim()) 
+  : ['http://localhost:3000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+const uploadPath = path.resolve(process.env.UPLOAD_PATH || 'uploads');
+app.use('/uploads', express.static(uploadPath));
 
 // Request logging
 app.use((req, res, next) => {
@@ -35,11 +50,21 @@ app.use((req, res, next) => {
 });
 
 // Health check
-app.get('/health', (req, res) => {
+app.get(['/health', '/health '], (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    service: 'WanderMates API'
+    service: 'WanderMeets API'
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Welcome to the WanderMeets API',
+    status: 'online',
+    version: '1.0.0',
+    healthCheck: '/health'
   });
 });
 
@@ -189,7 +214,7 @@ function broadcast(data, excludeUserId) {
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log('\n🚀 WanderMates Backend Server Started!');
+  console.log('\n🚀 WanderMeets Backend Server Started!');
   console.log(`📡 HTTP API: http://localhost:${PORT}`);
   console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);

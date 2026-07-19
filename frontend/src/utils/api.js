@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000'
+    : 'https://wandermeets-backend.onrender.com');
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
@@ -31,6 +34,10 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
+    }
+    // Format validation errors (errors array) to a single error string for UI compatibility
+    if (error.response?.data && error.response.data.errors && !error.response.data.error) {
+      error.response.data.error = error.response.data.errors.map(e => e.msg).join(', ');
     }
     return Promise.reject(error);
   }

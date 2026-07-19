@@ -2,10 +2,19 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure upload directory exists
-const uploadDir = 'uploads/';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+// Ensure upload directory exists safely
+let uploadDir;
+try {
+  uploadDir = path.resolve(process.env.UPLOAD_PATH || 'uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (error) {
+  console.error(`⚠️ Warning: Failed to create UPLOAD_PATH (${process.env.UPLOAD_PATH}): ${error.message}. Falling back to local './uploads' directory.`);
+  uploadDir = path.resolve('uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
 }
 
 // Storage configuration
@@ -35,7 +44,7 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 5 * 1024 * 1024 }, // Configurable size limit
   fileFilter: fileFilter
 });
 

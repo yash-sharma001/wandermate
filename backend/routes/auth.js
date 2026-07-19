@@ -8,15 +8,16 @@ const router = express.Router();
 
 // Register new user
 router.post('/register', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 }),
-  body('full_name').trim().isLength({ min: 2 }),
-  body('username').trim().isLength({ min: 3 }).matches(/^[a-zA-Z0-9_]+$/),
-  body('gender').optional().isIn(['male', 'female', 'other', 'prefer_not_to_say'])
+  body('email').isEmail().withMessage('Please enter a valid email address').normalizeEmail(),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
+  body('full_name').trim().isLength({ min: 2 }).withMessage('Display name must be at least 2 characters long'),
+  body('username').trim().isLength({ min: 3 }).withMessage('Username must be at least 3 characters long').matches(/^[a-zA-Z0-9_]+$/).withMessage('Username can only contain letters, numbers, and underscores'),
+  body('gender').optional({ checkFalsy: true }).isIn(['male', 'female', 'other', 'prefer_not_to_say']).withMessage('Invalid gender selection')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    console.log('⚠️ Registration Validation Failed:', errors.array());
+    return res.status(400).json({ error: errors.array().map(e => e.msg).join(', ') });
   }
 
   const { email, password, full_name, username, gender, date_of_birth, role } = req.body;
@@ -24,7 +25,8 @@ router.post('/register', [
   try {
     // Check if user already exists
     const existing = await db.callProc('sp_check_user_exists', [email, username]);
-    if (existing.length > 0) {
+    if (existing && existing.length > 0) {
+      console.log(`⚠️ Registration Conflict: User with email "${email}" or username "${username}" already exists.`);
       return res.status(400).json({ error: 'Email or username already exists' });
     }
 
@@ -67,11 +69,11 @@ router.post('/register', [
 // Login
 router.post('/login', [
   body('email').notEmpty().withMessage('Email or Username is required'),
-  body('password').exists()
+  body('password').exists().withMessage('Password is required')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    return res.status(400).json({ error: errors.array().map(e => e.msg).join(', ') });
   }
 
   const { email, password } = req.body;
