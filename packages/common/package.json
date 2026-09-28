@@ -1,0 +1,11 @@
+{
+  "name": "@wandermate/common",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.3"
+  }
+}

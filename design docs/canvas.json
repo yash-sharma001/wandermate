@@ -1,0 +1,265 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "ActivityDetails.dc.html": {
+      "h": 960,
+      "is_interactive": true,
+      "title": "Activity details",
+      "w": 390,
+      "x": 1410,
+      "y": 0
+    },
+    "Artboard-apbw.dc.html": {
+      "h": 120,
+      "title": "Artboard 1",
+      "w": 167,
+      "x": -480,
+      "y": 0
+    },
+    "CreateActivity.dc.html": {
+      "h": 1180,
+      "is_interactive": true,
+      "title": "Host an activity",
+      "w": 390,
+      "x": 1880,
+      "y": 0
+    },
+    "Explore.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Explore map",
+      "w": 390,
+      "x": 940,
+      "y": 0
+    },
+    "Journal.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Journal",
+      "w": 390,
+      "x": 1410,
+      "y": 1580
+    },
+    "Login.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Sign in",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "Main.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Landing",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "Marketplace.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Shop",
+      "w": 390,
+      "x": 470,
+      "y": 1580
+    },
+    "Profile.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Me \u00b7 Trust",
+      "w": 390,
+      "x": 1880,
+      "y": 1580
+    },
+    "SOSHold.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "SOS \u00b7 holding",
+      "w": 390,
+      "x": 0,
+      "y": 2824
+    },
+    "SOSSent.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "SOS \u00b7 alert sent",
+      "w": 390,
+      "x": 470,
+      "y": 2824
+    },
+    "Trips.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Trips",
+      "w": 390,
+      "x": 940,
+      "y": 1580
+    },
+    "VendorDashboard.dc.html": {
+      "h": 900,
+      "title": "Vendor dashboard (desktop)",
+      "w": 1440,
+      "x": 940,
+      "y": 2824
+    },
+    "Waves.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Waves",
+      "w": 390,
+      "x": 0,
+      "y": 1580
+    },
+    "DLanding.dc.html": {
+      "x": 0,
+      "y": 4124,
+      "w": 1440,
+      "h": 900,
+      "title": "Landing \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DLogin.dc.html": {
+      "x": 1520,
+      "y": 4124,
+      "w": 1440,
+      "h": 900,
+      "title": "Sign in \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DExplore.dc.html": {
+      "x": 0,
+      "y": 5144,
+      "w": 1440,
+      "h": 900,
+      "title": "Explore \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DActivityDetails.dc.html": {
+      "x": 1520,
+      "y": 5144,
+      "w": 1440,
+      "h": 960,
+      "title": "Activity details \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DCreateActivity.dc.html": {
+      "x": 0,
+      "y": 6224,
+      "w": 1440,
+      "h": 1000,
+      "title": "Host an activity \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DWaves.dc.html": {
+      "x": 1520,
+      "y": 6224,
+      "w": 1440,
+      "h": 900,
+      "title": "Waves \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DShop.dc.html": {
+      "x": 0,
+      "y": 7344,
+      "w": 1440,
+      "h": 900,
+      "title": "Shop \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DTrips.dc.html": {
+      "x": 1520,
+      "y": 7344,
+      "w": 1440,
+      "h": 900,
+      "title": "Trips \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DJournal.dc.html": {
+      "x": 0,
+      "y": 8364,
+      "w": 1440,
+      "h": 900,
+      "title": "Journal \u00b7 desktop",
+      "is_interactive": true
+    },
+    "DProfile.dc.html": {
+      "x": 1520,
+      "y": 8364,
+      "w": 1440,
+      "h": 900,
+      "title": "Me \u00b7 Trust \u00b7 desktop",
+      "is_interactive": true
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-28T05:31:51.461Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "row1": {
+      "kind": "title1",
+      "maxW": 2270,
+      "text": "Welcome, map and meetups",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "row2": {
+      "kind": "title1",
+      "maxW": 2270,
+      "text": "Rides, shop, trips, journal, profile",
+      "w": 240,
+      "x": 0,
+      "y": 1280
+    },
+    "row3": {
+      "kind": "title1",
+      "maxW": 2380,
+      "text": "Safety flow and vendor tools",
+      "w": 240,
+      "x": 0,
+      "y": 2524
+    },
+    "row4": {
+      "x": 0,
+      "y": 3824,
+      "text": "Desktop views",
+      "kind": "title1",
+      "maxW": 2960
+    }
+  },
+  "order": [
+    "Artboard-apbw.dc.html",
+    "Main.dc.html",
+    "Login.dc.html",
+    "Explore.dc.html",
+    "ActivityDetails.dc.html",
+    "CreateActivity.dc.html",
+    "Waves.dc.html",
+    "Marketplace.dc.html",
+    "Trips.dc.html",
+    "Journal.dc.html",
+    "Profile.dc.html",
+    "SOSHold.dc.html",
+    "SOSSent.dc.html",
+    "VendorDashboard.dc.html",
+    "DLanding.dc.html",
+    "DLogin.dc.html",
+    "DExplore.dc.html",
+    "DActivityDetails.dc.html",
+    "DCreateActivity.dc.html",
+    "DWaves.dc.html",
+    "DShop.dc.html",
+    "DTrips.dc.html",
+    "DJournal.dc.html",
+    "DProfile.dc.html"
+  ],
+  "pages": [],
+  "title": "Design"
+}

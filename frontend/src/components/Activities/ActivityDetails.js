@@ -1,261 +1,188 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Share2, Flag, Calendar, MapPin, ShieldCheck, Shield, Phone, Mail, Image as ImageIcon } from 'lucide-react';
 import { activitiesAPI } from '../../utils/api';
+import { typeIcon, typeLabel, initials } from '../../utils/activityTypes';
 import ReviewModal from '../Safety/ReviewModal';
 import ReportModal from '../Safety/ReportModal';
 import GroupChat from '../Chat/GroupChat';
-import { Phone, Mail, MessageSquare, MapPin, Clock, ShieldCheck } from 'lucide-react';
 import './Activities.css';
-
-const typeColors = {
-  'Hike': '#059669', 'Cafe': '#92400E', 'Night Out': '#7C3AED', 'Yoga': '#10B981',
-  'Food Tour': '#F59E0B', 'Arts': '#EC4899', 'Photography': '#6366F1',
-  'Weekend Trip': '#F97316', 'Sports': '#3B82F6', 'Spiritual': '#8B5CF6',
-  'Community': '#14B8A6', 'Other': '#6B7280'
-};
-const typeEmoji = {
-  'Hike': '⛰️', 'Cafe': '☕', 'Night Out': '✨', 'Yoga': '🧘', 'Food Tour': '🍜',
-  'Arts': '🎨', 'Photography': '📸', 'Weekend Trip': '🎒', 'Sports': '🏀',
-  'Spiritual': '🛕', 'Community': '🤝', 'Other': '📍'
-};
 
 function ActivityDetails({ user }) {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [activity, setActivity] = useState(null);
   const [attendees, setAttendees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState('details');
   const [showReview, setShowReview] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState('details');
-  const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => { fetchActivity(); }, [id]);
-
-  const fetchActivity = async () => {
+  const load = async () => {
     try {
-      setLoading(true);
       const res = await activitiesAPI.getById(id);
       setActivity(res.data.activity);
       setAttendees(res.data.attendees);
     } catch (err) {
-      setError('Failed to load activity');
+      setError(err.response?.data?.error || 'Failed to load activity');
     } finally {
       setLoading(false);
     }
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [id]);
 
-  const handleRSVP = async () => {
-    try {
-      setActionLoading(true);
-      await activitiesAPI.rsvp(id);
-      await fetchActivity();
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to RSVP');
-    } finally { setActionLoading(false); }
-  };
-
-  const handleCancelRSVP = async () => {
-    try {
-      setActionLoading(true);
-      await activitiesAPI.cancelRSVP(id);
-      await fetchActivity();
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to cancel RSVP');
-    } finally { setActionLoading(false); }
+  const act = async (fn, failMsg) => {
+    setBusy(true);
+    setError('');
+    try { await fn(); await load(); } catch (err) { setError(err.response?.data?.error || failMsg); } finally { setBusy(false); }
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this activity?')) {
-      try {
-        await activitiesAPI.delete(id);
-        navigate('/');
-      } catch (err) {
-        alert(err.response?.data?.error || 'Failed to delete');
-      }
-    }
+    if (!window.confirm('Delete this activity? Everyone who joined will lose it.')) return;
+    try { await activitiesAPI.delete(id); navigate('/'); } catch (err) { setError(err.response?.data?.error || 'Failed to delete'); }
   };
 
-  if (loading) return <div className="activity-details-container"><div className="spinner" style={{margin:'40px auto'}}></div></div>;
-  if (error || !activity) return (
-    <div className="activity-details-container" style={{padding:24,textAlign:'center'}}>
-      <p className="error-message">{error || 'Activity not found'}</p>
-      <button onClick={() => navigate('/')} className="btn btn-primary">Back to Map</button>
-    </div>
+  const share = async () => {
+    const url = window.location.href;
+    if (navigator.share) return navigator.share({ title: activity.title, url }).catch(() => {});
+    await navigator.clipboard?.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (loading) return <div className="empty"><div className="spinner" style={{ margin: '80px auto' }} /></div>;
+  if (!activity) return (
+    <div className="empty"><h3>{error || 'Activity not found'}</h3><button className="btn primary" onClick={() => navigate('/')}>Back to map</button></div>
   );
 
+  const Icon = typeIcon(activity.activity_type);
   const isHost = activity.host_id === user.id;
-  const hasRSVPed = activity.is_rsvped > 0;
-  const isConfirmed = hasRSVPed;
-  const isFull = activity.current_attendees >= activity.capacity;
-  const startTime = new Date(activity.start_time);
-  const isPast = startTime < new Date();
-  const bg = typeColors[activity.activity_type] || '#6B7280';
+  const joined = activity.is_rsvped > 0;
   const spotsLeft = activity.capacity - activity.current_attendees;
+  const start = new Date(activity.start_time);
+  const isPast = start < new Date();
+  const pct = Math.min(100, (activity.current_attendees / activity.capacity) * 100);
+  const womenOnly = activity.gender_filter === 'female';
+  const directions = `https://www.google.com/maps/dir/?api=1&destination=${activity.latitude},${activity.longitude}`;
+
+  const cta = isHost ? (
+    <button className="btn danger lg block" onClick={handleDelete}>Delete activity</button>
+  ) : isPast ? (
+    joined
+      ? <button className="btn primary lg block" onClick={() => setShowReview(true)}>Review {activity.host_name}</button>
+      : <div className="tag plain">This meetup has ended</div>
+  ) : joined ? (
+    <button className="btn lg block" disabled={busy} onClick={() => act(() => activitiesAPI.cancelRSVP(id), 'Failed to cancel RSVP')}>{busy ? 'Working…' : 'Cancel RSVP'}</button>
+  ) : spotsLeft <= 0 ? (
+    <div className="tag plain">This meetup is full</div>
+  ) : (
+    <button className="btn primary lg block" disabled={busy} onClick={() => act(() => activitiesAPI.rsvp(id), 'Failed to join')}>{busy ? 'Joining…' : 'Join meetup · Free'}</button>
+  );
 
   return (
-    <div className="activity-details-container">
-      {/* Hero */}
-      <div className="activity-detail-hero" style={{ background: bg }}>
-        <button className="activity-detail-back" onClick={() => navigate('/')}>←</button>
-        <span>{typeEmoji[activity.activity_type] || '📍'}</span>
-        <div className="activity-detail-type-badge">
-          {typeEmoji[activity.activity_type]} {activity.activity_type}
+    <div className="detail">
+      <div className="cover ph">
+        <button className="icon-btn back" onClick={() => navigate('/')} aria-label="Back"><ArrowLeft size={20} /></button>
+        <div className="cover-actions">
+          <button className="icon-btn" onClick={share} aria-label="Share"><Share2 size={18} /></button>
+          {!isHost && <button className="icon-btn" onClick={() => setShowReport(true)} aria-label="Report"><Flag size={18} /></button>}
         </div>
+        <span className="stack" style={{ alignItems: 'center', gap: 6, fontWeight: 700 }}><ImageIcon size={30} /> <small>{copied ? 'Link copied!' : 'Cover photo · host upload'}</small></span>
       </div>
 
-      <div className="activity-detail-content">
-        <div className="activity-detail-main">
-          <div className="activity-detail-tabs">
-            <button 
-              className={`tab-btn ${activeSubTab === 'details' ? 'active' : ''}`}
-              onClick={() => setActiveSubTab('details')}
-            >
-              Details
-            </button>
-            {(isConfirmed || isHost) && (
-              <button 
-                className={`tab-btn ${activeSubTab === 'chat' ? 'active' : ''}`}
-                onClick={() => setActiveSubTab('chat')}
-              >
-                <MessageSquare size={16} style={{marginRight: 6}} /> Group Chat
-              </button>
-            )}
+      <div className="detail-body">
+        <div className="detail-main stack">
+          <div className="row wrap" style={{ gap: 8 }}>
+            <span className="tag"><Icon size={13} /> {typeLabel(activity.activity_type)}</span>
+            {womenOnly && <span className="tag pink"><Shield size={12} /> Women-only</span>}
+          </div>
+          <h1>{activity.title}</h1>
+          <div className="row">
+            <span className="avatar lg">{initials(activity.host_name)}</span>
+            <div>
+              <b>Hosted by {activity.host_name}</b>
+              <div className="muted small">
+                {activity.host_verification === 'verified' && <span style={{ color: 'var(--violet)', fontWeight: 700 }}><ShieldCheck size={13} style={{ verticalAlign: '-2px' }} /> ID verified · </span>}
+                Trust score {activity.host_trust_score}
+              </div>
+            </div>
           </div>
 
-          {activeSubTab === 'details' ? (
+          {(joined || isHost) && <div className="tabs">
+            <button className={tab === 'details' ? 'active' : ''} onClick={() => setTab('details')}>Details</button>
+            <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Group chat</button>
+          </div>}
+
+          {error && <div className="alert">{error}</div>}
+
+          {tab === 'chat' ? <GroupChat type="activity" id={id} user={user} /> : (
             <>
-              <div className="activity-header">
-                <h1>{activity.title}</h1>
-                <div className="activity-meta">
-                  <span className="location"><MapPin size={16} /> {activity.location_name}</span>
-                  <span className="time"><Clock size={16} /> {startTime.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+              {/* Facts card: inline on phones, sticky side card on desktop */}
+              <div className="card facts side-mobile">
+                <div className="row"><span className="icon-tile"><Calendar size={20} /></span><div><b>{start.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} · {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</b>{activity.end_time && <div className="muted small">Until {new Date(activity.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>}</div></div>
+                <hr className="divider" />
+                <div className="row"><span className="icon-tile"><MapPin size={20} /></span><div className="grow"><b>{activity.location_name}</b></div><a href={directions} target="_blank" rel="noreferrer"><b>Directions</b></a></div>
+                <hr className="divider" />
+                <div className="row between"><b>{activity.current_attendees} of {activity.capacity} going</b><b style={{ color: 'var(--pink)' }}>{Math.max(0, spotsLeft)} spots left</b></div>
+                <div className="progress" style={{ marginTop: 8 }}><div style={{ width: `${pct}%` }} /></div>
+              </div>
+
+              {womenOnly && (
+                <div className="alert side-mobile"><Shield size={20} /><span><b>Women-only meetup.</b> Only women travelers with a verified phone can see and join this activity.</span></div>
+              )}
+
+              <section><h2>About</h2><p className="muted" style={{ marginTop: 8, fontSize: 16 }}>{activity.description || 'No description provided.'}</p></section>
+
+              <section>
+                <h2>Who's going</h2>
+                <div className="row wrap" style={{ marginTop: 10 }}>
+                  {attendees.length === 0 ? <span className="muted">Be the first to join.</span> : (
+                    <span className="avatar-stack">
+                      {attendees.slice(0, 6).map((a, i) => <span key={a.id} className={`avatar ${['', 'violet', 'amber', 'mint'][i % 4]}`} title={a.full_name}>{initials(a.full_name)}</span>)}
+                      {attendees.length > 6 && <span className="avatar plain-more">+{attendees.length - 6}</span>}
+                    </span>
+                  )}
                 </div>
-              </div>
+              </section>
 
-              <div className="activity-description">
-                <p>{activity.description || 'No description provided.'}</p>
-              </div>
-
-              {(isConfirmed || isHost) && (activity.host_phone || activity.host_email) && (
-                <div className="host-contact-section" style={{
-                  marginTop: 24, padding: 16, background: '#f0fdf4', border: '1px solid #dcfce7', borderRadius: 12
-                }}>
-                  <h3 style={{fontSize: 14, color: '#166534', marginBottom: 12, display:'flex', alignItems:'center', gap: 6}}>
-                    <ShieldCheck size={16} /> Host Contact Details
-                  </h3>
-                  <div style={{display:'flex', flexWrap:'wrap', gap: 20}}>
-                    {activity.host_phone && <div style={{display:'flex', alignItems:'center', gap: 8, fontSize: 13, color: '#14532d'}}>
-                      <Phone size={14} /> {activity.host_phone}
-                    </div>}
-                    {activity.host_email && <div style={{display:'flex', alignItems:'center', gap: 8, fontSize: 13, color: '#14532d'}}>
-                      <Mail size={14} /> {activity.host_email}
-                    </div>}
-                  </div>
+              {(joined || isHost) && (activity.host_phone || activity.host_email) && (
+                <div className="alert success"><ShieldCheck size={20} />
+                  <span><b>Host contact</b>
+                    {activity.host_phone && <div><Phone size={13} style={{ verticalAlign: '-2px' }} /> {activity.host_phone}</div>}
+                    {activity.host_email && <div><Mail size={13} style={{ verticalAlign: '-2px' }} /> {activity.host_email}</div>}
+                  </span>
                 </div>
               )}
             </>
-          ) : (
-            <div className="activity-chat-wrapper" style={{marginTop: 20}}>
-              <GroupChat type="activity" id={id} user={user} />
-            </div>
           )}
         </div>
 
-        <div className="activity-detail-host">
-          <div className="detail-host-avatar">{activity.host_name?.charAt(0)}</div>
-          <div className="detail-host-info">
-            <div className="detail-host-name">
-              {activity.host_name}
-              {activity.host_verification === 'verified' && <span className="badge badge-verified">✓ Verified</span>}
-            </div>
-            <div className="detail-host-meta">
-              <span className="badge badge-trust">⭐ {activity.host_trust_score} Trust</span>
-              <button 
-                onClick={() => setShowReport(true)} 
-                style={{ background:'none', border:'none', color:'#ef4444', fontSize:'11px', cursor:'pointer', padding:0, textDecoration:'underline', marginLeft:'8px' }}
-              >
-                Report Potential Fraud
-              </button>
+        <aside className="detail-side">
+          <div className="card stack sticky">
+            <div className="row"><span className="icon-tile"><Calendar size={20} /></span><div><b>{start.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} · {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</b></div></div>
+            <div className="row"><span className="icon-tile"><MapPin size={20} /></span><div className="grow"><b>{activity.location_name}</b></div><a href={directions} target="_blank" rel="noreferrer"><b>Directions</b></a></div>
+            <div><div className="row between"><b>{activity.current_attendees} of {activity.capacity} going</b><b style={{ color: 'var(--pink)' }}>{Math.max(0, spotsLeft)} spots left</b></div><div className="progress" style={{ marginTop: 8 }}><div style={{ width: `${pct}%` }} /></div></div>
+            {womenOnly && <div className="alert"><Shield size={18} /><span><b>Women-only.</b> Only women with a verified phone can join.</span></div>}
+            {cta}
+            <div className="grid-2">
+              <button className="btn" onClick={share}><Share2 size={16} /> Share</button>
+              {!isHost && <button className="btn" onClick={() => setShowReport(true)}><Flag size={16} /> Report</button>}
             </div>
           </div>
-        </div>
-
-        {/* Title & meta */}
-        <h1 className="activity-detail-title">{activity.title}</h1>
-        <div className="detail-meta-list">
-          <div className="detail-meta-item"><span className="icon">🕐</span> {startTime.toLocaleDateString()} at {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-          <div className="detail-meta-item"><span className="icon">📍</span> {activity.location_name}</div>
-        </div>
-
-        {/* Attendees */}
-        <div className="detail-attendees">
-          <h3>ATTENDEES ({activity.current_attendees} / {activity.capacity})</h3>
-          <div className="attendee-circles">
-            {attendees.slice(0, 4).map(a => (
-              <div key={a.id} className="attendee-circle">{a.full_name?.charAt(0)}</div>
-            ))}
-            {spotsLeft > 0 && <span className="attendee-more">+{spotsLeft} spots open</span>}
-          </div>
-        </div>
-
-        {/* Description */}
-        {activity.description && (
-          <div className="detail-description">
-            <h3>DESCRIPTION</h3>
-            <p>{activity.description}</p>
-          </div>
-        )}
+        </aside>
       </div>
 
-      {/* Bottom action */}
-      <div className="detail-bottom-action">
-        {isHost ? (
-          <button onClick={handleDelete} className="detail-join-btn" style={{ background: 'var(--alert-red)' }}>
-            Delete Activity
-          </button>
-        ) : isPast ? (
-          <div className="past-container" style={{ width:'100%' }}>
-            <div className="past-message" style={{ marginBottom:'12px' }}>This activity has ended</div>
-            {hasRSVPed && (
-              <button onClick={() => setShowReview(true)} className="btn-modern btn-modern-primary" style={{ width:'100%' }}>
-                Post a Review for {activity.host_name}
-              </button>
-            )}
-          </div>
-        ) : hasRSVPed ? (
-          <button onClick={handleCancelRSVP} className="detail-join-btn" style={{ background: 'var(--alert-red)' }} disabled={actionLoading}>
-            {actionLoading ? 'Processing...' : 'Cancel RSVP'}
-          </button>
-        ) : isFull ? (
-          <div className="full-message">This activity is full</div>
-        ) : (
-          <>
-            <button onClick={handleRSVP} className="detail-join-btn" disabled={actionLoading}>
-              {actionLoading ? 'Processing...' : '🎉 Join Activity'}
-            </button>
-          </>
-        )}
+      <div className="bottom-cta">
+        <div><b style={{ fontFamily: 'var(--font-head)', fontSize: 19 }}>{spotsLeft > 0 ? `${spotsLeft} spots left` : 'Full'}</b><div className="muted small">Free · you split any costs</div></div>
+        <div style={{ minWidth: 170 }}>{cta}</div>
       </div>
 
-      {/* Modals */}
-      {showReview && (
-        <ReviewModal 
-          entityId={activity.host_id} 
-          entityType="user" 
-          entityName={activity.host_name} 
-          onClose={() => setShowReview(false)} 
-        />
-      )}
-      {showReport && (
-        <ReportModal 
-          entityId={activity.id} 
-          entityType="activity" 
-          entityName={activity.title} 
-          onClose={() => setShowReport(false)} 
-        />
-      )}
+      {showReview && <ReviewModal userId={activity.host_id} entityName={activity.host_name} onClose={() => setShowReview(false)} />}
+      {showReport && <ReportModal reportedUserId={activity.host_id} entityId={activity.id} entityType="activity" entityName={activity.title} onClose={() => setShowReport(false)} />}
     </div>
   );
 }

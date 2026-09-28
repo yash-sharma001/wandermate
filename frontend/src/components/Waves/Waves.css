@@ -1,0 +1,47 @@
+.search-card { display: grid; grid-template-columns: 1fr auto 1fr 150px 110px auto; align-items: center; gap: 0; padding: 12px 12px 12px 8px; margin-bottom: 26px; }
+.search-card .cell { display: flex; flex-direction: column; padding: 4px 18px; border-right: 1.5px solid var(--line); position: relative; min-width: 0; }
+.search-card .cell small { color: var(--muted); font-size: 12.5px; }
+.search-card .cell input { border: 0; outline: 0; background: transparent; font-weight: 700; font-size: 15.5px; padding: 2px 0; width: 100%; }
+.search-card .cell svg { display: none; }
+.search-card .swap { margin: 0 4px; border-radius: 50%; }
+.dot { display: none; }
+.waves-layout { display: grid; grid-template-columns: 1fr 330px; gap: 26px; align-items: start; }
+
+.wave-card { display: grid; grid-template-columns: 1.4fr 1fr auto auto auto; align-items: center; gap: 18px; padding: 18px 20px; }
+.route { display: flex; gap: 14px; }
+.rail { display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
+.rail i { display: block; }
+.rail .from { width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--violet); }
+.rail .line { width: 2px; flex: 1; min-height: 22px; background: var(--violet-100); }
+.rail .to { width: 12px; height: 12px; border-radius: 3px; background: var(--pink); }
+.stops { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; font-family: var(--font-head); }
+.who { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.price { text-align: right; display: flex; flex-direction: column; }
+.price b { font-family: var(--font-head); font-size: 26px; line-height: 1; }
+
+.promo { background: var(--indigo); color: #fff; border-radius: 26px; padding: 24px; display: flex; flex-direction: column; gap: 14px; position: relative; overflow: hidden; }
+.promo::after { content: ''; position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: var(--violet); border-radius: 50%; z-index: 0; }
+.promo > * { position: relative; z-index: 1; }
+.promo p { color: rgba(255, 255, 255, .8); }
+.promo ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.promo li { display: flex; gap: 10px; align-items: center; color: rgba(255, 255, 255, .55); }
+.promo li.ok { color: #fff; }
+.promo li.todo { color: var(--amber-200); }
+
+.host-wave { max-width: 760px; }
+
+@media (max-width: 900px) {
+  .search-card { grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px; position: relative; }
+  .search-card .cell { border: 1.5px solid var(--line); border-radius: 14px; padding: 8px 14px; }
+  .search-card .cell:nth-of-type(1), .search-card .cell:nth-of-type(2) { grid-column: 1 / -1; }
+  .search-card .swap { position: absolute; right: 24px; top: 48px; z-index: 2; margin: 0; }
+  .search-card .btn { grid-column: 1 / -1; }
+  .waves-layout { display: block; }
+  .promo { margin-top: 22px; }
+  .wave-card { grid-template-columns: 1fr auto; gap: 14px; }
+  .wave-card .route, .wave-card .who { grid-column: 1 / -1; }
+  .wave-card .who { border-top: 1.5px solid var(--line); padding-top: 12px; }
+  .wave-card .price { grid-row: 1; grid-column: 2; }
+  .wave-card .route { grid-column: 1; grid-row: 1; }
+  .wave-card .tag { justify-self: start; }
+}

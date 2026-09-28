@@ -1,421 +1,183 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, ShieldCheck, Check, X, MapPin, Clock, Users, Minus, Plus, Search } from 'lucide-react';
+import { categoryIcon } from '../../utils/categoryIcons';
 import { packagesAPI } from '../../utils/api';
-import { Calendar, MapPin, Clock, Users, Star, ChevronLeft, ChevronRight, Search, Filter, X, Check } from 'lucide-react';
 import './TravelPackages.css';
 
-const CATEGORIES = ['All', 'Adventure', 'Trekking', 'Wellness', 'Cultural', 'Wildlife', 'Beach', 'Pilgrimage'];
+const CATEGORIES = ['All', 'Trekking', 'Adventure', 'Wellness', 'Cultural', 'Wildlife', 'Beach', 'Pilgrimage'];
+const TINT = { Trekking: 'mint', Adventure: 'sky', Wellness: 'pink', Cultural: 'peach', Wildlife: 'mint', Beach: 'sky', Pilgrimage: 'peach' };
+const inr = (n) => `₹${Math.round(Number(n)).toLocaleString('en-IN')}`;
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const asList = (v) => (Array.isArray(v) ? v : []);
+const nice = (s, opts) => new Date(`${s}T00:00:00`).toLocaleDateString([], opts);
 
-function TravelPackages({ user, userLocation }) {
+// A package runs on a date if it is one of its departure dates, or (with none listed) inside its availability window
+const runsOn = (p, date) => {
+  const deps = asList(p.departure_dates);
+  return deps.length ? deps.includes(date) : date >= p.available_from && date <= p.available_to;
+};
+
+function TravelPackages({ userLocation }) {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedPackage, setSelectedPackage] = useState(null);
-  const [bookingState, setBookingState] = useState({ loading: false, success: false, error: null });
-  const [bookingForm, setBookingForm] = useState({ travelers: 1, travel_date: '', notes: '' });
+  const [category, setCategory] = useState('All');
+  const [query, setQuery] = useState('');
+  const [date, setDate] = useState(null);
+  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selected, setSelected] = useState(null);
+  const [booking, setBooking] = useState({ loading: false, done: false, error: '' });
+  const [form, setForm] = useState({ travelers: 1, travel_date: '' });
 
-  useEffect(() => { fetchPackages(); }, [activeCategory, selectedDate, userLocation]);
-
-  const fetchPackages = async () => {
-    try {
+  useEffect(() => {
+    (async () => {
       setLoading(true);
-      const params = {};
-      if (activeCategory !== 'All') params.category = activeCategory;
-      if (selectedDate) params.travel_date = selectedDate;
-      if (userLocation) {
-        params.lat = userLocation.lat;
-        params.lng = userLocation.lng;
-        params.radius = 100000;
+      try {
+        const params = {};
+        if (category !== 'All') params.category = category;
+        if (userLocation) Object.assign(params, { lat: userLocation.lat, lng: userLocation.lng, radius: 100000 });
+        setPackages((await packagesAPI.getAll(params)).data.packages || []);
+      } catch (err) {
+        console.error('Error fetching packages:', err);
+        setPackages([]);
+      } finally {
+        setLoading(false);
       }
-      const res = await packagesAPI.getAll(params);
-      setPackages(res.data.packages || []);
-    } catch (err) {
-      console.error('Error fetching packages:', err);
-      setPackages([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+  }, [category, userLocation]);
 
-  const filteredPackages = packages.filter(p =>
-    !searchQuery ||
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.provider_name && p.provider_name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const today = iso(new Date());
+  const days = useMemo(() => {
+    const n = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    return Array.from({ length: n }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1)).filter((d) => iso(d) >= iso(new Date()));
+  }, [month]);
+  const hasTrip = (d) => packages.some((p) => runsOn(p, iso(d)));
 
-  // Calendar helpers
-  const calendarDays = useMemo(() => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const days = [];
-    for (let i = 0; i < firstDay; i++) days.push(null);
-    for (let d = 1; d <= daysInMonth; d++) days.push(d);
-    return days;
-  }, [currentMonth]);
+  const shown = packages.filter((p) =>
+    (!date || runsOn(p, date)) &&
+    (!query || `${p.title} ${p.destination} ${p.provider_name || ''}`.toLowerCase().includes(query.toLowerCase())));
 
-  const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const open = (p) => { setSelected(p); setBooking({ loading: false, done: false, error: '' }); setForm({ travelers: 1, travel_date: date || '' }); };
 
-  const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-  const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-
-  const handleDayClick = (day) => {
-    if (!day) return;
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const today = new Date().toISOString().split('T')[0];
-    if (dateStr < today) return;
-    setSelectedDate(prev => prev === dateStr ? null : dateStr);
-  };
-
-  const isSelectedDay = (day) => {
-    if (!day || !selectedDate) return false;
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return dateStr === selectedDate;
-  };
-
-  const isPastDay = (day) => {
-    if (!day) return false;
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return dateStr < new Date().toISOString().split('T')[0];
-  };
-
-  const isToday = (day) => {
-    if (!day) return false;
-    const today = new Date();
-    return day === today.getDate() && currentMonth.getMonth() === today.getMonth() && currentMonth.getFullYear() === today.getFullYear();
-  };
-
-  const openPackage = (pkg) => {
-    setSelectedPackage(pkg);
-    setBookingState({ loading: false, success: false, error: null });
-    setBookingForm({ travelers: 1, travel_date: selectedDate || '', notes: '' });
-  };
-
-  const handleBook = async () => {
-    if (!bookingForm.travel_date) {
-      setBookingState({ loading: false, success: false, error: 'Please select a travel date' });
-      return;
-    }
-    setBookingState({ loading: true, success: false, error: null });
+  const book = async () => {
+    if (!form.travel_date) return setBooking({ loading: false, done: false, error: 'Please choose a travel date' });
+    setBooking({ loading: true, done: false, error: '' });
     try {
-      await packagesAPI.book(selectedPackage.id, {
-        travelers: bookingForm.travelers,
-        travel_date: bookingForm.travel_date,
-        notes: bookingForm.notes || undefined
-      });
-      setBookingState({ loading: false, success: true, error: null });
+      await packagesAPI.book(selected.id, { travelers: form.travelers, travel_date: form.travel_date });
+      setBooking({ loading: false, done: true, error: '' });
     } catch (err) {
-      const msg = err.response?.data?.error || 'Failed to book package';
-      setBookingState({ loading: false, success: false, error: msg });
+      setBooking({ loading: false, done: false, error: err.response?.data?.error || 'Failed to book package' });
     }
   };
 
-  const parseJSON = (val) => {
-    if (!val) return [];
-    if (Array.isArray(val)) return val;
-    try { return JSON.parse(val); } catch { return []; }
-  };
-
-  // Get departure dates for the selected package to highlight on calendar
-  const getDepartureDatesForMonth = (pkg) => {
-    const dates = parseJSON(pkg?.departure_dates);
-    const month = currentMonth.getMonth();
-    const year = currentMonth.getFullYear();
-    return dates.filter(d => {
-      const dt = new Date(d);
-      return dt.getMonth() === month && dt.getFullYear() === year;
-    }).map(d => new Date(d).getDate());
-  };
+  const includes = asList(selected?.includes);
+  const itinerary = asList(selected?.itinerary);
+  const departures = asList(selected?.departure_dates).filter((d) => d >= today).slice(0, 8);
 
   return (
-    <div className="packages-page">
-      {/* Header */}
-      <div className="packages-header">
-        <div className="packages-header-content">
-          <h1>Travel Packages</h1>
-          <p>Discover curated travel experiences</p>
-        </div>
-        <div className="packages-search">
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="Search packages, destinations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+    <>
+      <div className="page-head"><div><h1>Trips</h1><p>Multi-day trips from verified operators.</p></div>
+        <div className="input-icon trips-search"><Search size={18} /><input className="input" placeholder="Search trips or places" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
       </div>
 
-      {/* Calendar */}
-      <div className="packages-calendar-section">
-        <div className="calendar-header">
-          <h3><Calendar size={18} /> Select Travel Date</h3>
-          {selectedDate && (
-            <button className="clear-date-btn" onClick={() => setSelectedDate(null)}>
-              <X size={14} /> Clear
-            </button>
-          )}
-        </div>
-        <div className="calendar-nav">
-          <button onClick={prevMonth}><ChevronLeft size={20} /></button>
-          <span className="calendar-month-label">{monthLabel}</span>
-          <button onClick={nextMonth}><ChevronRight size={20} /></button>
-        </div>
-        <div className="calendar-weekdays">
-          {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-            <div key={d} className="calendar-weekday">{d}</div>
-          ))}
-        </div>
-        <div className="calendar-days">
-          {calendarDays.map((day, i) => (
-            <button
-              key={i}
-              className={`calendar-day ${!day ? 'empty' : ''} ${isSelectedDay(day) ? 'selected' : ''} ${isPastDay(day) ? 'past' : ''} ${isToday(day) ? 'today' : ''}`}
-              onClick={() => handleDayClick(day)}
-              disabled={!day || isPastDay(day)}
-            >
-              {day || ''}
-            </button>
-          ))}
-        </div>
-        {selectedDate && (
-          <div className="calendar-selected-info">
-            <Calendar size={14} />
-            Showing packages available on <strong>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</strong>
+      <div className="card cal">
+        <div className="row between">
+          <b style={{ fontFamily: 'var(--font-head)', fontSize: 19 }}>{month.toLocaleDateString([], { month: 'long', year: 'numeric' })}</b>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="icon-btn sm" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft size={16} /></button>
+            <button className="icon-btn sm" aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight size={16} /></button>
           </div>
-        )}
-      </div>
-
-      {/* Category chips */}
-      <div className="packages-categories">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            className={`pkg-category-chip ${activeCategory === cat ? 'active' : ''}`}
-            onClick={() => setActiveCategory(cat)}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {/* Results */}
-      <div className="packages-results">
-        <div className="results-header">
-          <h2>{filteredPackages.length} Package{filteredPackages.length !== 1 ? 's' : ''} Available</h2>
         </div>
+        <div className="days">
+          {days.map((d) => {
+            const s = iso(d);
+            return (
+              <button key={s} disabled={s < today} className={`day ${date === s ? 'on' : ''}`} onClick={() => setDate(date === s ? null : s)}>
+                <small>{d.toLocaleDateString([], { weekday: 'short' })}</small>
+                <b>{d.getDate()}</b>
+                <i className={hasTrip(d) ? 'dot' : ''} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-        {loading ? (
-          <div className="packages-loading"><div className="spinner"></div></div>
-        ) : filteredPackages.length === 0 ? (
-          <div className="packages-empty">
-            <Compass size={48} strokeWidth={1} />
-            <h3>No packages found</h3>
-            <p>Try a different date, category, or search term</p>
-          </div>
-        ) : (
-          <div className="packages-grid">
-            {filteredPackages.map((pkg) => (
-              <div key={pkg.id} className="package-card" onClick={() => openPackage(pkg)}>
-                <div className="package-card-image">
-                  <div className="package-category-badge">{pkg.category}</div>
-                  {pkg.provider_verified ? <div className="package-verified-badge"><Check size={12} /> Verified</div> : null}
+      <div className="chips" style={{ margin: '18px 0' }}>
+        {CATEGORIES.map((c) => <button key={c} className={`chip ${category === c ? 'active' : ''}`} onClick={() => setCategory(c)}>{c}</button>)}
+      </div>
+
+      <div className="row between" style={{ marginBottom: 12 }}>
+        <h2>{date ? `Departing ${nice(date, { weekday: 'short', day: 'numeric', month: 'short' })}` : 'All upcoming trips'}</h2>
+        <span className="muted small">{shown.length} trip{shown.length === 1 ? '' : 's'}</span>
+      </div>
+
+      {loading ? <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
+        : shown.length === 0 ? <div className="card empty"><h3>No trips found</h3><p>Try another date, category or search.</p></div>
+        : (
+          <div className="trip-grid">
+            {shown.map((p) => (
+              <div key={p.id} className="card trip">
+                <div className={`ph ${TINT[p.category] ?? ''} cover`}>
+                  {p.image_url ? <img src={p.image_url} alt="" /> : React.createElement(categoryIcon(p.category), { size: 44, strokeWidth: 1.6 })}
+                  <span className="tag mint cat">{p.category}</span>
+                  {p.provider_verified === 1 && <span className="tag dark ver"><ShieldCheck size={12} /> Verified operator</span>}
                 </div>
-                <div className="package-card-body">
-                  <h3>{pkg.title}</h3>
-                  <div className="package-meta">
-                    <span className="package-dest"><MapPin size={14} /> {pkg.destination}</span>
-                    <span className="package-duration"><Clock size={14} /> {pkg.duration_days} day{pkg.duration_days > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="package-provider">by {pkg.provider_name || 'Provider'}</div>
-                  <div className="package-card-footer">
-                    <div className="package-price">
-                      <span className="price-amount">₹{Number(pkg.price).toLocaleString()}</span>
-                      <span className="price-unit">/ person</span>
-                    </div>
-                    <div className="package-rating">
-                      <Star size={14} fill="#F59E0B" stroke="#F59E0B" />
-                      <span>{pkg.rating || '4.5'}</span>
-                    </div>
-                  </div>
+                <div className="stack" style={{ gap: 6, padding: '4px 4px 2px' }}>
+                  <h3>{p.title}</h3>
+                  <span className="muted small">{p.duration_days} day{p.duration_days > 1 ? 's' : ''} · {p.destination}{p.provider_name ? ` · ${p.provider_name}` : ''}</span>
+                  <hr className="divider" style={{ margin: '6px 0' }} />
+                  <div className="row between"><span><b className="price">{inr(p.price)}</b> <span className="muted small">/ person</span></span>
+                    <button className="btn primary" onClick={() => open(p)}>View trip</button></div>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
 
-      {/* Package Detail Modal */}
-      {selectedPackage && (
-        <div className="pkg-detail-overlay" onClick={() => setSelectedPackage(null)}>
-          <div className="pkg-detail-sheet" onClick={(e) => e.stopPropagation()}>
-            <button className="pkg-detail-close" onClick={() => setSelectedPackage(null)}><X size={20} /></button>
-
-            <div className="pkg-detail-hero">
-              <div className="pkg-detail-category">{selectedPackage.category}</div>
-              <h2>{selectedPackage.title}</h2>
-              <div className="pkg-detail-provider">
-                by {selectedPackage.provider_name}
-                {selectedPackage.provider_verified ? <span className="verified-tag"><Check size={12} /> Verified</span> : null}
-              </div>
+      {selected && (
+        <div className="overlay sheet-bottom" onClick={() => setSelected(null)}>
+          <div className="sheet stack" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className={`ph ${TINT[selected.category] ?? ''} sheet-cover`}>
+              {selected.image_url ? <img src={selected.image_url} alt="" /> : React.createElement(categoryIcon(selected.category), { size: 48, strokeWidth: 1.6 })}
+              <button className="icon-btn sm x" onClick={() => setSelected(null)} aria-label="Close"><X size={16} /></button>
             </div>
-
-            <div className="pkg-detail-body">
-              {/* Quick info */}
-              <div className="pkg-info-grid">
-                <div className="pkg-info-item">
-                  <MapPin size={18} />
-                  <div>
-                    <span className="info-label">Destination</span>
-                    <span className="info-value">{selectedPackage.destination}</span>
-                  </div>
-                </div>
-                <div className="pkg-info-item">
-                  <Clock size={18} />
-                  <div>
-                    <span className="info-label">Duration</span>
-                    <span className="info-value">{selectedPackage.duration_days} day{selectedPackage.duration_days > 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-                <div className="pkg-info-item">
-                  <Users size={18} />
-                  <div>
-                    <span className="info-label">Group Size</span>
-                    <span className="info-value">Max {selectedPackage.max_travelers}</span>
-                  </div>
-                </div>
-                <div className="pkg-info-item">
-                  <Star size={18} fill="#F59E0B" stroke="#F59E0B" />
-                  <div>
-                    <span className="info-label">Rating</span>
-                    <span className="info-value">{selectedPackage.rating || '4.5'} ({selectedPackage.total_bookings} bookings)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="pkg-section">
-                <h3>About This Package</h3>
-                <p>{selectedPackage.description || 'No description available.'}</p>
-              </div>
-
-              {/* Includes */}
-              {parseJSON(selectedPackage.includes).length > 0 && (
-                <div className="pkg-section">
-                  <h3>What's Included</h3>
-                  <ul className="pkg-includes-list">
-                    {parseJSON(selectedPackage.includes).map((item, i) => (
-                      <li key={i}><Check size={16} className="include-check" /> {item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Itinerary */}
-              {parseJSON(selectedPackage.itinerary).length > 0 && (
-                <div className="pkg-section">
-                  <h3>Itinerary</h3>
-                  <div className="pkg-itinerary">
-                    {parseJSON(selectedPackage.itinerary).map((day, i) => (
-                      <div key={i} className="itinerary-day">
-                        <div className="itinerary-marker">
-                          <div className="marker-dot" />
-                          {i < parseJSON(selectedPackage.itinerary).length - 1 && <div className="marker-line" />}
-                        </div>
-                        <div className="itinerary-content">
-                          <div className="itinerary-day-label">Day {day.day || i + 1}</div>
-                          <h4>{day.title}</h4>
-                          <p>{day.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Departure Dates */}
-              {parseJSON(selectedPackage.departure_dates).length > 0 && (
-                <div className="pkg-section">
-                  <h3>Available Departure Dates</h3>
-                  <div className="departure-dates">
-                    {parseJSON(selectedPackage.departure_dates)
-                      .filter(d => d >= new Date().toISOString().split('T')[0])
-                      .slice(0, 6)
-                      .map((d, i) => (
-                        <button
-                          key={i}
-                          className={`departure-date-chip ${bookingForm.travel_date === d ? 'selected' : ''}`}
-                          onClick={() => setBookingForm({ ...bookingForm, travel_date: d })}
-                        >
-                          {new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Booking */}
-              {bookingState.success ? (
-                <div className="pkg-booking-success">
-                  <Check size={48} className="success-icon" />
-                  <h3>Booking Confirmed!</h3>
-                  <p>Your booking for <strong>{selectedPackage.title}</strong> has been placed.</p>
-                  <button className="btn-pkg-book" onClick={() => { setBookingState({ loading: false, success: false, error: null }); setSelectedPackage(null); }}>Done</button>
-                </div>
-              ) : (
-                <div className="pkg-booking-form">
-                  <div className="pkg-booking-row">
-                    <label>
-                      <span>Travelers</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max={selectedPackage.max_travelers}
-                        value={bookingForm.travelers}
-                        onChange={(e) => setBookingForm({ ...bookingForm, travelers: Math.max(1, parseInt(e.target.value) || 1) })}
-                      />
-                    </label>
-                    <label>
-                      <span>Travel Date</span>
-                      <input
-                        type="date"
-                        value={bookingForm.travel_date}
-                        min={new Date().toISOString().split('T')[0]}
-                        onChange={(e) => setBookingForm({ ...bookingForm, travel_date: e.target.value })}
-                      />
-                    </label>
-                  </div>
-                  <div className="pkg-booking-total">
-                    Total: <strong>₹{(selectedPackage.price * bookingForm.travelers).toLocaleString()}</strong>
-                    <span className="total-breakdown">({bookingForm.travelers} × ₹{Number(selectedPackage.price).toLocaleString()})</span>
-                  </div>
-                  {bookingState.error && <p className="pkg-booking-error">{bookingState.error}</p>}
-                  <button
-                    className="btn-pkg-book"
-                    disabled={bookingState.loading}
-                    onClick={handleBook}
-                  >
-                    {bookingState.loading ? 'Booking...' : 'Book Now'}
-                  </button>
-                </div>
-              )}
+            <div className="row wrap" style={{ gap: 8 }}><span className="tag mint">{selected.category}</span>{selected.provider_verified === 1 && <span className="tag dark"><ShieldCheck size={12} /> Verified operator</span>}</div>
+            <div><h2>{selected.title}</h2><p className="muted">by {selected.provider_name}</p></div>
+            <div className="grid-2 facts">
+              <span><MapPin size={16} /> {selected.destination}</span>
+              <span><Clock size={16} /> {selected.duration_days} day{selected.duration_days > 1 ? 's' : ''}</span>
+              <span><Users size={16} /> Max {selected.max_travelers}</span>
+              <span><Check size={16} /> {selected.total_bookings} bookings</span>
             </div>
+            <p>{selected.description}</p>
+            {includes.length > 0 && <div><h3>What's included</h3><ul className="incl">{includes.map((i) => <li key={i}><Check size={15} /> {i}</li>)}</ul></div>}
+            {itinerary.length > 0 && (
+              <div><h3>Itinerary</h3>
+                <ol className="itin">{itinerary.map((d, i) => <li key={i}><b>Day {d.day || i + 1} · {d.title}</b><p className="muted small">{d.desc}</p></li>)}</ol></div>
+            )}
+            {booking.done ? (
+              <div className="alert success"><Check size={20} /><span><b>Booking placed!</b> The operator will confirm shortly.</span></div>
+            ) : (
+              <>
+                {departures.length > 0 && (
+                  <div><h3>Departures</h3>
+                    <div className="chips" style={{ flexWrap: 'wrap', marginTop: 8 }}>
+                      {departures.map((d) => <button key={d} className={`chip ${form.travel_date === d ? 'active' : ''}`} onClick={() => setForm({ ...form, travel_date: d })}>{nice(d, { day: 'numeric', month: 'short' })}</button>)}
+                    </div></div>
+                )}
+                <div className="grid-2">
+                  <div className="field"><label>Travelers</label>
+                    <div className="stepper"><button type="button" onClick={() => setForm({ ...form, travelers: Math.max(1, form.travelers - 1) })}><Minus size={16} /></button><b>{form.travelers}</b><button type="button" className="plus" onClick={() => setForm({ ...form, travelers: Math.min(selected.max_travelers || 20, form.travelers + 1) })}><Plus size={16} /></button></div></div>
+                  <div className="field"><label htmlFor="tdate">Travel date</label><input id="tdate" type="date" className="input" min={today} value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} /></div>
+                </div>
+                <div className="row between"><span className="muted">Total</span><b style={{ fontFamily: 'var(--font-head)', fontSize: 24 }}>{inr(selected.price * form.travelers)}</b></div>
+                {booking.error && <div className="alert">{booking.error}</div>}
+                <button className="btn primary lg block" disabled={booking.loading} onClick={book}>{booking.loading ? 'Booking…' : 'Book this trip'}</button>
+              </>
+            )}
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Compass({ size, strokeWidth }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
-    </svg>
+    </>
   );
 }
 

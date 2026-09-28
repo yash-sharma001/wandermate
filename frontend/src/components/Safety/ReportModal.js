@@ -1,90 +1,67 @@
 import React, { useState } from 'react';
-import { ShieldAlert, X } from 'lucide-react';
+import { Flag, X } from 'lucide-react';
 import { safetyAPI } from '../../utils/api';
 
-const REPORT_CATEGORIES = [
-  'Fraud / Scam',
-  'Harassment',
-  'Safety Concern',
-  'Inappropriate Content',
-  'Other'
-];
+const REASONS = ['Fraud / Scam', 'Harassment', 'Safety concern', 'Inappropriate content', 'Other'];
 
-function ReportModal({ entityId, entityType, entityName, onClose }) {
-  const [category, setCategory] = useState(REPORT_CATEGORIES[0]);
+// Reports are filed against a person (reportedUserId) and optionally the thing they posted
+function ReportModal({ reportedUserId, entityId, entityType = 'user', entityName, onClose }) {
+  const [reason, setReason] = useState(REASONS[0]);
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+    setError('');
     try {
       await safetyAPI.reportFraud({
-        entity_id: entityId,
+        reported_user_id: reportedUserId,
+        entity_id: entityType === 'user' ? undefined : entityId,
         entity_type: entityType,
-        report_type: category,
-        description
+        reason,
+        description,
       });
-      alert('Report submitted. Our safety team will investigate this immediately. Thank you for keeping WanderMates safe.');
-      onClose();
+      setDone(true);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to submit report');
+      setError(err.response?.data?.error || 'Failed to submit report');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <button className="modal-close" onClick={onClose}><X size={20} /></button>
-        <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px' }}>
-          <ShieldAlert color="#ef4444" size={24} />
-          <h2 className="modal-title" style={{ margin:0 }}>Report Concern</h2>
+    <div className="overlay" onClick={onClose}>
+      <form className="sheet stack" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+        <div className="sheet-head">
+          <div className="row"><span className="icon-tile pink"><Flag size={20} /></span><h2>Report a concern</h2></div>
+          <button type="button" className="icon-btn sm" onClick={onClose} aria-label="Close"><X size={16} /></button>
         </div>
-        <p className="modal-subtitle">Tell us what's wrong with this {entityType} by {entityName}.</p>
-
-        <form onSubmit={handleSubmit}>
-          <div className="report-type-grid">
-            {REPORT_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                className={`report-type-btn ${category === cat ? 'selected' : ''}`}
-                onClick={() => setCategory(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display:'block', fontSize:'12px', fontWeight:'700', marginBottom:'8px', textTransform:'uppercase', color:'#64748b' }}>
-              Details
-            </label>
-            <textarea
-              className="modern-input"
-              rows="4"
-              placeholder="Please provide specifics to help us investigate..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-            ></textarea>
-          </div>
-
-          <button
-            type="submit"
-            className="btn-modern"
-            style={{ width: '100%', background: '#ef4444', color: 'white' }}
-            disabled={submitting}
-          >
-            {submitting ? 'Submitting...' : 'Submit Report'}
-          </button>
-          <p style={{ fontSize:'11px', color:'#94a3b8', textAlign:'center', marginTop:'12px' }}>
-            Your report is confidential. Misuse of the reporting system may lead to account suspension.
-          </p>
-        </form>
-      </div>
+        {done ? (
+          <>
+            <div className="alert success">Report submitted. Our safety team will look into it. Thank you for keeping WanderMates safe.</div>
+            <button type="button" className="btn dark block" onClick={onClose}>Done</button>
+          </>
+        ) : (
+          <>
+            <p className="muted">Tell us what's wrong with {entityName ? `“${entityName}”` : 'this'}.</p>
+            <div className="chips" style={{ flexWrap: 'wrap' }}>
+              {REASONS.map((r) => (
+                <button key={r} type="button" className={`chip ${reason === r ? 'active' : ''}`} onClick={() => setReason(r)}>{r}</button>
+              ))}
+            </div>
+            <div className="field">
+              <label htmlFor="report-text">Details</label>
+              <textarea id="report-text" className="textarea" placeholder="Please share specifics to help us investigate…" value={description} onChange={(e) => setDescription(e.target.value)} required />
+            </div>
+            {error && <div className="alert">{error}</div>}
+            <button className="btn danger lg block" disabled={submitting}>{submitting ? 'Submitting…' : 'Submit report'}</button>
+            <p className="muted small center">Reports are confidential. Misuse may lead to account suspension.</p>
+          </>
+        )}
+      </form>
     </div>
   );
 }

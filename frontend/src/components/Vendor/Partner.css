@@ -1,0 +1,24 @@
+/* Shared by the vendor and trip-operator dashboards (sidebar layout lives in Navbar) */
+.partner { max-width: 1180px; }
+.partner .stats4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 22px 0; }
+.partner .stat4 { background: #fff; border: 1.5px solid var(--line); border-radius: 20px; padding: 16px 18px; }
+.partner .stat4 small { color: var(--muted); font-weight: 600; }
+.partner .stat4 b { display: block; font-family: var(--font-head); font-size: 34px; line-height: 1.15; }
+.partner .stat4.alert-num b { color: var(--pink); }
+.partner .cols { display: grid; grid-template-columns: 1.7fr 1fr; gap: 20px; align-items: start; }
+.partner table { width: 100%; border-collapse: collapse; }
+.partner th { text-align: left; font-size: 12.5px; color: var(--muted); font-weight: 700; padding: 8px 8px 10px; }
+.partner td { padding: 12px 8px; border-top: 1.5px solid var(--line); vertical-align: middle; }
+.partner th:last-child, .partner td:last-child { text-align: right; }
+.partner .who { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.exp { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1.5px solid var(--line); border-radius: 18px; }
+.exp .ph { width: 52px; height: 52px; border-radius: 14px; flex: none; }
+.add-dashed { border: 2px dashed var(--amber-200); border-radius: 18px; background: transparent; padding: 16px; font-weight: 700; color: var(--ink); }
+@media (max-width: 900px) {
+  .partner .stats4 { grid-template-columns: 1fr 1fr; }
+  .partner .cols { grid-template-columns: 1fr; }
+  .partner table, .partner tbody, .partner tr, .partner td { display: block; }
+  .partner thead { display: none; }
+  .partner tr { border-top: 1.5px solid var(--line); padding: 10px 0; }
+  .partner td { border: 0; padding: 3px 0; text-align: left !important; }
+}

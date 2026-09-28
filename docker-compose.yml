@@ -1,0 +1,126 @@
+# WanderMates: monorepo, multi-service. Entry point is the gateway on http://localhost:${GATEWAY_PORT:-80}
+#   gateway (nginx + React build) ─┬─ /api/auth, /api/upload ─> auth, actions (Express)
+#                                  └─ /v1/graphql ─> hasura ─> postgres
+#   actions/worker: RabbitMQ (mail + SOS), Redis (token blacklist, rate limits)
+
+x-service-env: &service-env
+  DATABASE_URL: postgres://wandermate:${POSTGRES_PASSWORD}@postgres:5432/wandermate
+  REDIS_URL: redis://redis:6379
+  RABBITMQ_URL: amqp://wandermate:${RABBITMQ_PASSWORD}@rabbitmq:5672
+  JWT_SECRET: ${JWT_SECRET}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wandermate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: wandermate
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # init scripts run once, in name order, on first start of an empty volume
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wandermate"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes: [redisdata:/data]
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: wandermate
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports: ["15672:15672"] # management UI
+    volumes: [rabbitmqdata:/var/lib/rabbitmq]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 10
+
+  hasura:
+    image: hasura/graphql-engine:v2.40.0
+    depends_on:
+      postgres: { condition: service_healthy }
+      auth: { condition: service_started }
+    ports: ["8080:8080"] # console: http://localhost:8080 (admin secret required)
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://wandermate:${POSTGRES_PASSWORD}@postgres:5432/wandermate
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET}
+      HASURA_GRAPHQL_AUTH_HOOK: http://auth:5001/api/auth/hasura
+      HASURA_GRAPHQL_AUTH_HOOK_MODE: GET
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+    restart: unless-stopped
+
+  # One-shot: applies tables/permissions/actions/event triggers (hasura/bootstrap.js) once Hasura is up
+  hasura-init:
+    image: node:20-alpine
+    depends_on: [hasura]
+    working_dir: /app
+    volumes: ["./hasura:/app:ro"]
+    environment:
+      HASURA_URL: http://hasura:8080
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET}
+      ACTIONS_URL: http://actions:5002
+    command: node bootstrap.js
+    restart: on-failure
+
+  auth:
+    build: { context: ., args: { SERVICE: auth } }
+    environment: *service-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+    restart: unless-stopped
+
+  actions:
+    build: { context: ., args: { SERVICE: actions } }
+    environment:
+      <<: *service-env
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_VERIFY_SERVICE_ID: ${TWILIO_VERIFY_SERVICE_ID:-}
+    volumes: ["./services/actions/uploads:/app/services/actions/uploads"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    build: { context: ., args: { SERVICE: worker } }
+    environment:
+      <<: *service-env
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  gateway:
+    build: { context: ., dockerfile: gateway/Dockerfile }
+    ports: ["${GATEWAY_PORT:-80}:80"]
+    depends_on: [auth, actions, hasura]
+    restart: unless-stopped
+
+  # Optional public link: `docker compose --profile share up -d tunnel`, then read the
+  # https://….trycloudflare.com URL from `docker compose logs tunnel`. The URL changes each start.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["share"]
+    command: tunnel --no-autoupdate --url http://gateway:80
+    depends_on: [gateway]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmqdata:

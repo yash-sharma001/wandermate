@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WanderMates — Journal</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#FFF6E9}
+a{color:#5B2EE0}a:hover{color:#3A1A9E}
+</style>
+</helmet>
+<div style="width:390px;height:844px;position:relative;overflow:hidden;background:#FFF6E9;font-family:'DM Sans',system-ui,sans-serif;color:#1E1B3A;box-sizing:border-box;padding:20px 20px 0;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between">
+<div>
+<h1 style="margin:0;font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.6px">Journal</h1>
+<p style="margin:4px 0 0;font-size:15px;color:#5E5873">Your memories, on the map.</p>
+</div>
+<span style="height:30px;padding:0 10px;border-radius:9px;background:#FCE9D2;color:#45405E;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px;margin-top:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Only you</span>
+</div>
+<div style="position:relative;height:150px;border-radius:20px;overflow:hidden;border:1px solid #F0E0CC">
+<svg width="350" height="150" viewBox="0 0 350 150" style="position:absolute;left:0;top:0" aria-hidden="true">
+<rect width="350" height="150" fill="#F4EEDF"></rect>
+<ellipse cx="290" cy="40" rx="60" ry="30" fill="#C9F0D0"></ellipse>
+<path d="M110 0 C130 50 80 80 140 110 S200 140 190 150" stroke="#9FD8FF" stroke-width="22" fill="none"></path>
+<path d="M0 60 L350 90" stroke="#FFFFFF" stroke-width="6"></path>
+<path d="M240 0 L260 150" stroke="#FFFFFF" stroke-width="5"></path>
+<path d="M60 120 L178 80 L270 44" stroke="#D1226B" stroke-width="2" stroke-dasharray="4 5" fill="none"></path>
+</svg>
+<div style="position:absolute;left:48px;top:108px;width:24px;height:24px;border-radius:12px;background:#FFF0F6;border:3px solid #D1226B;box-sizing:border-box;display:flex;align-items:center;justify-content:center"><div style="width:7px;height:7px;border-radius:4px;background:#D1226B"></div></div>
+<div style="position:absolute;left:166px;top:68px;width:24px;height:24px;border-radius:12px;background:#FFF0F6;border:3px solid #D1226B;box-sizing:border-box;display:flex;align-items:center;justify-content:center"><div style="width:7px;height:7px;border-radius:4px;background:#D1226B"></div></div>
+<div style="position:absolute;left:256px;top:30px;width:30px;height:30px;border-radius:15px;background:#D1226B;border:3px solid #FFFFFF;box-sizing:border-box;box-shadow:0 4px 10px rgba(194,65,12,0.4)"></div>
+<button type="button" style="position:absolute;right:10px;bottom:10px;height:36px;padding:0 12px;border-radius:10px;border:none;background:#FFFFFF;color:#1E1B3A;font-family:inherit;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(30,27,58,0.15)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>Full map</button>
+</div>
+<div style="display:flex;gap:8px">
+<button type="button" aria-pressed="true" style="height:36px;padding:0 12px;border-radius:10px;border:none;background:#1E1B3A;color:#FFF6E9;font-family:inherit;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path></svg>Rishikesh</button>
+<button type="button" style="height:36px;padding:0 12px;border-radius:10px;border:1px solid #F0E0CC;background:#FFFFFF;color:#1E1B3A;font-family:inherit;font-size:13px;font-weight:600">All places</button>
+</div>
+<div style="display:flex;gap:14px">
+<div style="width:40px;display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+<span style="font-size:11px;font-weight:700;color:#5E5873">SEP</span>
+<span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;line-height:1">27</span>
+<div style="width:2px;flex-grow:1;background:#E8D4BC;margin-top:8px"></div>
+</div>
+<article style="flex-grow:1;background:#FFFFFF;border:1px solid #F0E0CC;border-radius:18px;padding:10px;display:flex;flex-direction:column;gap:10px">
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:6px">
+<div style="height:92px;border-radius:12px;background:#FFD9E6;display:flex;align-items:center;justify-content:center;color:#A3104F"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="m21 16-5-5-9 9"></path></svg></div>
+<div style="height:92px;border-radius:12px;background:#FFE8C7;display:flex;align-items:center;justify-content:center;color:#9A6412;font-size:14px;font-weight:700">+2</div>
+</div>
+<div style="padding:0 4px 4px;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+<h2 style="margin:0;font-size:16px;font-weight:700;line-height:1.25">Evening aarti at Triveni Ghat</h2>
+<span style="height:24px;padding:0 8px;border-radius:7px;background:#FFE3EF;color:#A3104F;font-size:11px;font-weight:700;display:inline-flex;align-items:center;flex-shrink:0">Peaceful</span>
+</div>
+<div style="font-size:12px;color:#5E5873">Triveni Ghat · 6:40 PM</div>
+<p style="margin:0;font-size:14px;line-height:1.45;color:#45405E">Floated a diya with Anu and Meera. The bells and the river at once — I want to remember that sound.</p>
+</div>
+</article>
+</div>
+<div style="display:flex;gap:14px">
+<div style="width:40px;display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+<span style="font-size:11px;font-weight:700;color:#5E5873">SEP</span>
+<span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;line-height:1">25</span>
+</div>
+<article style="flex-grow:1;background:#FFFFFF;border:1px solid #F0E0CC;border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:6px">
+<h2 style="margin:0;font-size:16px;font-weight:700">First chai in Tapovan</h2>
+<div style="font-size:12px;color:#5E5873">Little Buddha Cafe · 9:10 AM</div>
+</article>
+</div>
+<button type="button" style="position:absolute;left:20px;bottom:98px;height:52px;padding:0 20px;border:none;border-radius:26px;background:#1E1B3A;color:#FFF6E9;font-family:inherit;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 20px rgba(30,27,58,0.3)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Capture a memory</button>
+<a href="SOSHold.dc.html" aria-label="SOS. Press and hold to alert your emergency contacts" style="position:absolute;right:16px;bottom:96px;width:56px;height:56px;border-radius:28px;background:#B42318;color:#FFFFFF;border:4px solid #FFFFFF;box-shadow:0 6px 18px rgba(180,35,24,0.40);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;text-decoration:none;box-sizing:border-box">SOS</a>
+<nav aria-label="Main" style="position:absolute;left:12px;right:12px;bottom:14px;height:68px;background:#FFFFFF;border:1px solid #F0E0CC;border-radius:22px;display:flex;justify-content:space-around;align-items:center;box-shadow:0 8px 24px rgba(30,27,58,0.12)">
+<a href="Explore.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:54px;height:52px;border-radius:14px;text-decoration:none;color:#5E5873;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path><path d="M9 3v15M15 6v15"></path></svg><span>Explore</span></a>
+<a href="Waves.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:54px;height:52px;border-radius:14px;text-decoration:none;color:#5E5873;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17V13l2-5a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 5v4z"></path><circle cx="7.5" cy="17" r="1.5"></circle><circle cx="16.5" cy="17" r="1.5"></circle></svg><span>Waves</span></a>
+<a href="Marketplace.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:54px;height:52px;border-radius:14px;text-decoration:none;color:#5E5873;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l1 13H5z"></path><path d="M9 7a3 3 0 0 1 6 0"></path></svg><span>Shop</span></a>
+<a href="Trips.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:54px;height:52px;border-radius:14px;text-decoration:none;color:#5E5873;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V10a7 7 0 0 1 14 0v11z"></path><path d="M9 21v-5h6v5M9 4.5V3h6v1.5"></path></svg><span>Trips</span></a>
+<a href="Journal.dc.html" aria-current="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:54px;height:52px;border-radius:14px;text-decoration:none;background:#EDE6FF;color:#3A1A9E;font-size:11px;font-weight:700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z"></path><path d="M8 7h8"></path></svg><span>Journal</span></a>
+<a href="Profile.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:54px;height:52px;border-radius:14px;text-decoration:none;color:#5E5873;font-size:11px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg><span>Me</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

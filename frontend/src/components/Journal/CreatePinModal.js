@@ -1,222 +1,133 @@
 import React, { useState, useEffect } from 'react';
+import { X, Image as ImageIcon, MapPin, Navigation } from 'lucide-react';
 import { pinsAPI } from '../../utils/api';
-import { X, Image as ImageIcon, MapPin, Calendar, Type, StickyNote, Smile, Navigation } from 'lucide-react';
+import { MOODS } from '../../utils/moods';
 import './TravelJournal.css';
 
-function CreatePinModal({ onClose, onSuccess, initialLocation }) {
-  const [formData, setFormData] = useState({
-    title: '', 
-    note: '', 
-    location_name: '',
-    latitude: initialLocation?.lat ? initialLocation.lat.toFixed(6) : '', 
-    longitude: initialLocation?.lng ? initialLocation.lng.toFixed(6) : '', 
-    mood_emoji: '📍',
-    visit_date: new Date().toISOString().slice(0, 16),
-    images: []
-  });
-  
-  const [imagePreviews, setImagePreviews] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const pad = (n) => String(n).padStart(2, '0');
+const nowLocal = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 
+const formatAddress = (feat) => {
+  const p = feat?.properties;
+  if (!p) return '';
+  const city = p.city || p.district || p.town || '';
+  return [p.name, city && city !== p.name ? city : '', p.country && p.country !== city && p.country !== p.name ? p.country : '']
+    .filter(Boolean).join(', ');
+};
+
+function CreatePinModal({ onClose, onSuccess, initialLocation }) {
+  const [form, setForm] = useState({
+    title: '', note: '', location_name: '', mood_emoji: 'pin', visit_date: nowLocal(),
+    latitude: initialLocation?.lat ?? '', longitude: initialLocation?.lng ?? '',
+  });
+  const [images, setImages] = useState([]);
+  const [previews, setPreviews] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const set = (patch) => { setForm((f) => ({ ...f, ...patch })); setError(''); };
+
+  const locate = () => {
+    if (!navigator.geolocation) return setError('Geolocation is not supported by this browser.');
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords: { latitude, longitude } }) => {
+        set({ latitude, longitude });
+        try {
+          const feat = (await (await fetch(`https://photon.komoot.io/reverse?lon=${longitude}&lat=${latitude}`)).json()).features?.[0];
+          const name = formatAddress(feat);
+          if (name) set({ location_name: name });
+        } catch (e) { /* the name can be typed */ }
+      },
+      () => setError('Could not get your location.')
+    );
+  };
+
+  // Pinned from the map: prefill the place name; from the journal: use where the user is
   useEffect(() => {
     if (initialLocation) {
-      setFormData(prev => ({
-        ...prev,
-        latitude: initialLocation.lat.toFixed(6),
-        longitude: initialLocation.lng.toFixed(6)
-      }));
+      (async () => {
+        try {
+          const feat = (await (await fetch(`https://photon.komoot.io/reverse?lon=${initialLocation.lng}&lat=${initialLocation.lat}`)).json()).features?.[0];
+          const name = formatAddress(feat);
+          if (name) setForm((f) => ({ ...f, location_name: f.location_name || name }));
+        } catch (e) { /* optional */ }
+      })();
     }
   }, [initialLocation]);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-  const handleImageChange = (e) => {
+  const addImages = (e) => {
     const files = Array.from(e.target.files);
-    if (files.length + formData.images.length > 5) {
-      alert('You can only upload up to 5 images per entry.');
-      return;
-    }
-    const newPreviews = files.map(file => URL.createObjectURL(file));
-    setFormData({
-      ...formData,
-      images: [...formData.images, ...files]
-    });
-    setImagePreviews([...imagePreviews, ...newPreviews]);
+    if (files.length + images.length > 5) return setError('You can add up to 5 photos per memory.');
+    setImages([...images, ...files]);
+    setPreviews([...previews, ...files.map((f) => URL.createObjectURL(f))]);
   };
-
-  const removeImage = (index) => {
-    const defaultImages = [...formData.images];
-    defaultImages.splice(index, 1);
-    const newPreviews = [...imagePreviews];
-    URL.revokeObjectURL(newPreviews[index]);
-    newPreviews.splice(index, 1);
-    setFormData({ ...formData, images: defaultImages });
-    setImagePreviews(newPreviews);
+  const removeImage = (i) => {
+    URL.revokeObjectURL(previews[i]);
+    setImages(images.filter((_, j) => j !== i));
+    setPreviews(previews.filter((_, j) => j !== i));
   };
+  const close = () => { previews.forEach((u) => URL.revokeObjectURL(u)); onClose(); };
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (isSubmitting) return;
-    
-    setIsSubmitting(true);
+    if (submitting) return;
+    if (form.latitude === '' || form.longitude === '') return setError('Set a location first: use “Use my location”, or drop a pin on the map.');
+    setSubmitting(true);
     try {
       const data = new FormData();
-      data.append('title', formData.title || '');
-      data.append('note', formData.note || '');
-      data.append('location_name', formData.location_name);
-      data.append('latitude', formData.latitude || 0);
-      data.append('longitude', formData.longitude || 0);
-      data.append('mood_emoji', formData.mood_emoji);
-      data.append('visit_date', formData.visit_date);
-      
-      formData.images.forEach(img => {
-        data.append('images', img);
-      });
-
+      ['title', 'note', 'location_name', 'latitude', 'longitude', 'mood_emoji'].forEach((k) => data.append(k, form[k] ?? ''));
+      data.append('visit_date', new Date(form.visit_date).toISOString());
+      images.forEach((img) => data.append('images', img));
       await pinsAPI.create(data);
-      onSuccess();
-      handleClose();
-    } catch (err) { 
-      alert('Failed to save memory: ' + (err.response?.data?.error || err.message)); 
+      onSuccess?.();
+      close();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    imagePreviews.forEach(url => URL.revokeObjectURL(url));
-    onClose();
-  };
-
-  const formatAddress = (feat) => {
-    if (!feat || !feat.properties) return '';
-    const p = feat.properties;
-    const name = p.name || '';
-    const city = p.city || p.district || p.town || '';
-    const country = p.country || '';
-    
-    const parts = [];
-    if (name) parts.push(name);
-    if (city && city !== name) parts.push(city);
-    if (country && country !== city && country !== name) parts.push(country);
-    
-    return parts.join(', ');
-  };
-
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          
-          setFormData(prev => ({
-            ...prev,
-            latitude: lat.toFixed(6),
-            longitude: lng.toFixed(6)
-          }));
-
-          // Reverse geocode to get city name
-          try {
-            const res = await fetch(`https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}`);
-            const data = await res.json();
-            const feat = data.features?.[0];
-            if (feat) {
-              const fullName = formatAddress(feat);
-              setFormData(prev => ({ ...prev, location_name: fullName }));
-            }
-          } catch (e) { console.error(e); }
-        },
-        () => alert('Could not get actual location.')
-      );
-    } else {
-      alert('Geolocation is not supported by this browser.');
-    }
-  };
+  const located = form.latitude !== '' && form.longitude !== '';
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content glass-modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: 500}}>
-        <div className="modal-header">
-          <h2>Capture a Memory</h2>
-          <button type="button" className="modal-close-btn" onClick={handleClose}>
-            <X size={20} />
-          </button>
+    <div className="overlay sheet-bottom" onClick={close}>
+      <form className="sheet stack" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+        <div className="sheet-head"><h2>Capture a memory</h2><button type="button" className="icon-btn sm" onClick={close} aria-label="Close"><X size={16} /></button></div>
+
+        <div className="row between card flat" style={{ padding: 12 }}>
+          <span className="row"><MapPin size={16} color="var(--pink)" /> <b>{located ? `${(+form.latitude).toFixed(4)}, ${(+form.longitude).toFixed(4)}` : 'No location yet'}</b></span>
+          <button type="button" className="btn sm" onClick={locate}><Navigation size={14} /> Use my location</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="journal-form">
-          <div className="location-badge">
-            <MapPin size={16} />
-            <span>{Number(formData.latitude).toFixed(4)}, {Number(formData.longitude).toFixed(4)}</span>
-            <button type="button" onClick={getCurrentLocation} className="btn-icon-inline" title="Use current location">
-              <Navigation size={14} />
-            </button>
+        <div className="field">
+          <label>Photos <span className="muted small">(up to 5)</span></label>
+          <div className="photo-row">
+            <label className="add-photo"><input type="file" multiple accept="image/*" onChange={addImages} hidden /><ImageIcon size={22} /><small>Add</small></label>
+            {previews.map((src, i) => (
+              <div className="thumb" key={src}><img src={src} alt="" /><button type="button" onClick={() => removeImage(i)} aria-label="Remove photo"><X size={12} /></button></div>
+            ))}
           </div>
+        </div>
 
-          <div className="photo-upload-container">
-            <label className="photo-upload-btn">
-              <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
-              <div className="upload-icon-wrapper">
-                <ImageIcon size={40} />
-              </div>
-              <span style={{fontWeight: 800, color: 'var(--text-main)'}}>Add Photos</span>
-              <span style={{fontSize: 12, marginTop: 4}}>Share up to 5 special moments</span>
-            </label>
-            {imagePreviews.length > 0 && (
-              <div className="image-previews">
-                {imagePreviews.map((src, index) => (
-                  <div key={index} className="preview-item">
-                    <img src={src} alt="Preview" />
-                    <button type="button" className="remove-preview" onClick={() => removeImage(index)}>
-                      <X size={12} strokeWidth={3} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="field"><label htmlFor="pt">Title</label><input id="pt" className="input" value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder="Evening aarti at Triveni Ghat" /></div>
+        <div className="field"><label htmlFor="pl">Place *</label><input id="pl" className="input" required value={form.location_name} onChange={(e) => set({ location_name: e.target.value })} placeholder="Where was this?" /></div>
+        <div className="field"><label htmlFor="pd">When *</label><input id="pd" type="datetime-local" className="input" required value={form.visit_date} onChange={(e) => set({ visit_date: e.target.value })} /></div>
+        <div className="field">
+          <div className="row between"><label htmlFor="pn">The story</label><span className="muted small">{form.note.length}/500</span></div>
+          <textarea id="pn" className="textarea" maxLength={500} value={form.note} onChange={(e) => set({ note: e.target.value })} placeholder="Write something you want to remember…" />
+        </div>
+        <div className="field"><label>What was it like?</label>
+          <div className="mood-grid">
+            {MOODS.map(({ key, label, icon: Icon }) => (
+              <button type="button" key={key} className={`mood ${form.mood_emoji === key ? 'active' : ''}`} onClick={() => set({ mood_emoji: key })}><Icon size={20} /><span>{label}</span></button>
+            ))}
           </div>
+        </div>
 
-          <div className="form-grid">
-            <div className="form-group">
-              <label className="form-label"><Type size={14} style={{verticalAlign:'middle', marginRight:'4px'}}/> TITLE</label>
-              <input type="text" name="title" className="form-input" value={formData.title} onChange={handleChange} placeholder="Morning Magic, etc." />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label"><MapPin size={14} style={{verticalAlign:'middle', marginRight:'4px'}}/> LOCATION NAME *</label>
-              <input type="text" name="location_name" className="form-input" value={formData.location_name} onChange={handleChange} placeholder="Where was this?" required />
-            </div>
-            
-            <div className="form-group">
-              <label className="form-label"><Calendar size={14} style={{verticalAlign:'middle', marginRight:'6px'}}/> DATE & TIME *</label>
-              <input type="datetime-local" name="visit_date" className="form-input" value={formData.visit_date} onChange={handleChange} required />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label"><StickyNote size={14} style={{verticalAlign:'middle', marginRight:'6px'}}/> TELL THE STORY</label>
-              <textarea name="note" className="form-input" value={formData.note} onChange={handleChange} placeholder="Write something special about this moment..." rows="4" maxLength="500" />
-              <div className="char-count">{formData.note.length}/500</div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label"><Smile size={14} style={{verticalAlign:'middle', marginRight:'4px'}}/> VIBE CHECK</label>
-              <div className="mood-selector">
-                {['📍', '☕', '🏨', '⛰️', '🏖️', '🍽️', '📸', '✨', '🧘', '🚴', '🏰', '🛶', '🛤️', '🎒', '🌇', '🏮', '🎭'].map((emoji) => (
-                  <button key={emoji} type="button" className={`mood-btn ${formData.mood_emoji === emoji ? 'selected' : ''}`}
-                    onClick={() => setFormData({ ...formData, mood_emoji: emoji })}>{emoji}</button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="modal-actions">
-            <button type="button" onClick={handleClose} className="btn-secondary">Dismiss</button>
-            <button type="submit" className="btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Storytelling...' : 'Save Memory ✨'}
-            </button>
-          </div>
-        </form>
-      </div>
+        {error && <div className="alert" role="alert">{error}</div>}
+        <button className="btn primary lg block" disabled={submitting}>{submitting ? 'Saving…' : 'Save memory'}</button>
+      </form>
     </div>
   );
 }

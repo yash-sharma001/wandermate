@@ -1,390 +1,62 @@
-# WanderMates MVP - Full Stack Social Travel Platform
+# WanderMates
 
-A complete working MVP of the WanderMates social travel platform with real-time features, interactive maps, and travel journaling.
-
-## 🚀 Features Implemented
-
-### Core Features
-- ✅ **Real-Time Social Map** - Interactive map showing nearby activities with live updates
-- ✅ **Activity Creation & RSVP** - Host meetups and join others' activities
-- ✅ **User Authentication** - Secure login/registration with JWT
-- ✅ **Profile Management** - Update bio, interests, and view activity history
-- ✅ **Private Travel Journal** - Document memories with location pins
-- ✅ **Trust & Safety** - Verification levels and trust scores
-- ✅ **Gender Filters** - Privacy controls for activity visibility
-- ✅ **Crowdsourced Recommendations** - Organic location recommendations based on user pins
-- ✅ **WebSocket Real-Time Updates** - Live activity updates without refresh
-
-### Tech Stack
-
-**Backend:**
-- Node.js + Express
-- PostgreSQL with PostGIS (geographic queries)
-- WebSocket for real-time updates
-- JWT authentication
-- RESTful API
-
-**Frontend:**
-- React 18
-- React Leaflet (interactive maps)
-- Axios (API client)
-- React Router (navigation)
-- CSS3 with design system
-
-## 📋 Prerequisites
-
-Before running this project, make sure you have:
-
-1. **Node.js** (v16 or higher) - [Download](https://nodejs.org/)
-2. **PostgreSQL** (v12 or higher) - [Download](https://www.postgresql.org/download/)
-3. **npm** or **yarn** package manager
-
-## 🛠️ Installation & Setup
-
-### Step 1: Install PostgreSQL
-
-#### macOS:
-```bash
-brew install postgresql@14
-brew services start postgresql@14
-```
-
-#### Ubuntu/Debian:
-```bash
-sudo apt update
-sudo apt install postgresql postgresql-contrib postgis
-sudo systemctl start postgresql
-```
-
-#### Windows:
-Download and install from [postgresql.org](https://www.postgresql.org/download/windows/)
-
-### Step 2: Create Database
-
-```bash
-# Login to PostgreSQL
-psql -U postgres
-
-# In PostgreSQL shell:
-CREATE DATABASE wandermates;
-\q
-```
-
-### Step 3: Configure Environment Variables
-
-#### Backend (.env):
-```bash
-cd backend
-cp .env.example .env
-```
-
-Edit `backend/.env` with your database credentials:
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=wandermates
-DB_USER=postgres
-DB_PASSWORD=your_postgres_password
-
-PORT=5000
-JWT_SECRET=change-this-to-a-random-secret-key
-```
-
-### Step 4: Install Dependencies
-
-#### Backend:
-```bash
-cd backend
-npm install
-```
-
-#### Frontend:
-```bash
-cd frontend
-npm install
-```
-
-### Step 5: Initialize Database
-
-```bash
-cd backend
-npm run init-db
-```
-
-This will create all tables, indexes, and sample data.
-
-### Step 6: Start the Application
-
-#### Terminal 1 - Start Backend:
-```bash
-cd backend
-npm start
-```
-
-Backend will run on: http://localhost:5000
-
-#### Terminal 2 - Start Frontend:
-```bash
-cd frontend
-npm start
-```
-
-Frontend will open automatically at: http://localhost:3000
-
-## 🔐 Demo Login Credentials
+Social travel platform: activities map, ride-sharing "waves", travel journal, marketplace, packages, group chat and safety tools.
+Monorepo, multi-service, fully dockerised.
 
 ```
-Email: sarah@example.com
-Password: password123
+                       ┌───────────────────────────────┐
+browser ── :80 ──────> │ gateway (nginx + React build) │
+                       └──┬──────────┬────────────┬────┘
+                /api/auth │  /api/upload,/uploads  │ /v1/graphql (HTTP + websocket)
+                          v          v             v
+                        auth      actions       hasura ──> postgres
+                          │          │             │  (auth webhook = auth service)
+                          └─ redis ──┤             └─ event trigger ─> actions
+                                     └─ rabbitmq ──> worker (email, SOS SMS/WhatsApp)
 ```
 
-Additional test users:
-```
-Email: alex@example.com
-Password: password123
+| Service | What it does |
+| --- | --- |
+| `gateway` | nginx: serves the React build, routes `/api/auth`, `/api/upload`, `/uploads`, `/v1/graphql` |
+| `hasura` | The data API. Every read/write in the app is GraphQL; permissions are row-level on `X-Hasura-User-Id` |
+| `postgres` | Schema, triggers, views and SQL functions in [db/](db/) (loaded on first start) |
+| `auth` | Register / login / logout, issues JWTs, and is Hasura's **auth webhook** (`/api/auth/hasura`) |
+| `actions` | Hasura actions that need the outside world (email OTP, phone OTP, SOS), file uploads, event-trigger webhook |
+| `worker` | RabbitMQ consumer: sends email and SOS SMS/WhatsApp |
+| `redis` | JWT revocation list (logout), login/OTP rate limits |
+| `rabbitmq` | `mail` and `sos` queues (management UI on http://localhost:15672) |
+| `hasura-init` | One-shot: applies [hasura/bootstrap.js](hasura/bootstrap.js) (tracking, relationships, permissions, actions, event trigger) |
 
-Email: priya@example.com
-Password: password123
-```
-
-## 📱 How to Use
-
-### 1. Login/Register
-- Use demo credentials or create a new account
-- Gender field is required for activity filtering
-
-### 2. Explore the Map
-- The map centers on your current location (or Rishikesh by default)
-- See nearby activities with custom markers
-- Adjust radius filter (1-50 km)
-- Toggle gender filter for privacy
-- Enable "Show Recommendations" to see popular places
-
-### 3. Create an Activity
-- Click "+ Create Activity" button
-- Fill in details (title, type, location, time)
-- Use "Use Current Location" to auto-fill coordinates
-- Set capacity and gender filter
-- Activity appears on map in real-time
-
-### 4. Join Activities
-- Click on any activity marker on the map
-- View full details and host information
-- Click "Join Activity" to RSVP
-- See other attendees
-
-### 5. Travel Journal
-- Navigate to "Journal" in top menu
-- Click "+ Add Entry" to create private pins
-- Document memories with notes and moods
-- Entries are private and only visible to you
-- When 15+ users pin the same location, it becomes a recommendation
-
-### 6. Profile
-- View and edit your profile
-- See your hosted and attending activities
-- Update bio, interests, and location
-
-## 🗺️ API Endpoints
-
-### Authentication
-```
-POST /api/auth/register - Register new user
-POST /api/auth/login - Login user
-```
-
-### Activities
-```
-GET  /api/activities/nearby - Get activities within radius
-GET  /api/activities/:id - Get activity details
-POST /api/activities - Create new activity
-POST /api/activities/:id/rsvp - RSVP to activity
-DELETE /api/activities/:id/rsvp - Cancel RSVP
-DELETE /api/activities/:id - Delete activity (host only)
-```
-
-### Users
-```
-GET /api/users/me - Get current user profile
-GET /api/users/:id - Get user by ID
-PATCH /api/users/me - Update profile
-GET /api/users/me/activities - Get user's activities
-```
-
-### Private Pins (Journal)
-```
-GET /api/pins - Get user's private pins
-GET /api/pins/:id - Get single pin
-POST /api/pins - Create new pin
-PATCH /api/pins/:id - Update pin
-DELETE /api/pins/:id - Delete pin
-```
-
-### Recommendations
-```
-GET /api/recommendations/nearby - Get recommendations near location
-GET /api/recommendations/:id - Get recommendation details
-```
-
-## 🏗️ Project Structure
+## Run
 
 ```
-wandermates-mvp/
-├── backend/
-│   ├── config/
-│   │   └── database.js
-│   ├── middleware/
-│   │   └── auth.js
-│   ├── routes/
-│   │   ├── auth.js
-│   │   ├── activities.js
-│   │   ├── users.js
-│   │   ├── pins.js
-│   │   └── recommendations.js
-│   ├── scripts/
-│   │   └── init-db.js
-│   ├── server.js
-│   ├── package.json
-│   └── .env
-│
-└── frontend/
-    ├── public/
-    │   └── index.html
-    ├── src/
-    │   ├── components/
-    │   │   ├── Auth/
-    │   │   │   ├── Login.js
-    │   │   │   ├── Register.js
-    │   │   │   └── Auth.css
-    │   │   ├── Map/
-    │   │   │   ├── MapView.js
-    │   │   │   └── MapView.css
-    │   │   ├── Activities/
-    │   │   │   ├── CreateActivity.js
-    │   │   │   ├── ActivityDetails.js
-    │   │   │   └── Activities.css
-    │   │   ├── Profile/
-    │   │   │   ├── Profile.js
-    │   │   │   └── Profile.css
-    │   │   ├── Journal/
-    │   │   │   ├── TravelJournal.js
-    │   │   │   └── TravelJournal.css
-    │   │   └── Layout/
-    │   │       ├── Navbar.js
-    │   │       └── Navbar.css
-    │   ├── utils/
-    │   │   ├── api.js
-    │   │   └── websocket.js
-    │   ├── App.js
-    │   ├── App.css
-    │   ├── index.js
-    │   └── index.css
-    ├── package.json
-    └── .env
+cp .env.example .env      # set the secrets
+docker compose up --build
 ```
 
-## 🔍 Troubleshooting
+App: http://localhost (`GATEWAY_PORT` in `.env`). Hasura console: http://localhost:8080 (admin secret from `.env`).
+Sample users (from [db/03-seed.sql](db/03-seed.sql)): `sarah@example.com`, `alex@example.com`, `priya@example.com`, `vendor@example.com`. The password is the one the old seed used.
 
-### Database Connection Issues
-```bash
-# Check if PostgreSQL is running
-sudo systemctl status postgresql  # Linux
-brew services list  # macOS
+Reset the database: `docker compose down -v`.
 
-# Test connection
-psql -U postgres -d wandermates
+## How it fits together
+
+- **JWT auth**: `auth` signs a 7-day JWT with a `jti`. Hasura calls `auth`'s webhook on every request (including websocket subscriptions), which verifies the token and checks Redis for a logout revocation, then returns `X-Hasura-User-Id`. Row access is enforced by Hasura permissions and the `hasura_session` argument of SQL functions.
+- **Business rules live in Postgres**: RSVP capacity, ride requests / approvals, bookings and pricing, trust score updates, recommendation promotion. They are SQL functions in [db/02-logic.sql](db/02-logic.sql), exposed as GraphQL mutations/queries.
+- **Views** in the same file are flat read models (for example `activity_details`, `wave_requests_detail`); Hasura permissions filter them per viewer.
+- **Chat** is a GraphQL subscription on `group_messages`; only the host and confirmed members can open or read a trip chat.
+- **Groups and expense splitting**: trip groups have a member list, live chat and Splitwise-style expenses (equal or exact splits, any payer, cash/UPI/card/in-app). Balances, settle-up suggestions and monthly summaries are computed from the `expenses`, `expense_splits` and `settlements` tables ([db/04-groups.sql](db/04-groups.sql)). Views carry a `viewer_id` so only group members can read them. The app records payments and opens the payee's UPI app via a `upi://` link; it does not move money itself.
+- **Async work**: `actions` publishes `mail` / `sos` messages to RabbitMQ and `worker` delivers them. A Hasura event trigger on `wave_requests` emails the host when someone asks to join.
+- **Design**: the UI follows [design docs/design.pdf](design%20docs/design.pdf). Tokens and shared primitives (cards, buttons, chips, tabs, sheets) live in [frontend/src/theme.css](frontend/src/theme.css); each screen has its own small stylesheet. Phones get a bottom tab bar and a floating SOS button, desktop gets the top nav, and vendors/operators get the indigo sidebar. SOS is press-and-hold (or tap, then tap three times) in [SOSButton.js](frontend/src/components/Safety/SOSButton.js).
+- **Frontend data layer**: [frontend/src/utils/api.js](frontend/src/utils/api.js) wraps the GraphQL operations behind the same `activitiesAPI`, `wavesAPI`, ... functions the components already used.
+
+## Layout
+
 ```
-
-### Port Already in Use
-```bash
-# Backend (Port 5000)
-lsof -ti:5000 | xargs kill -9
-
-# Frontend (Port 3000)
-lsof -ti:3000 | xargs kill -9
+db/            Postgres init: schema, logic (views/functions/triggers), seed
+hasura/        bootstrap.js -> Hasura metadata
+packages/common  shared: pg pool, redis, rabbitmq helpers, JWT verification
+services/auth, actions, worker
+gateway/       nginx config + image that builds the frontend
+frontend/      React app
 ```
-
-### PostGIS Extension Error
-```bash
-# Install PostGIS
-sudo apt install postgis  # Ubuntu/Debian
-brew install postgis  # macOS
-
-# In PostgreSQL:
-CREATE EXTENSION postgis;
-```
-
-### Node Modules Issues
-```bash
-# Clear and reinstall
-rm -rf node_modules package-lock.json
-npm install
-```
-
-## 🚀 Production Deployment
-
-### Environment Variables for Production
-
-**Backend:**
-```env
-NODE_ENV=production
-DB_HOST=your-production-db-host
-JWT_SECRET=strong-random-secret-key
-```
-
-**Frontend:**
-```env
-REACT_APP_API_URL=https://your-api-domain.com
-REACT_APP_WS_URL=wss://your-api-domain.com
-```
-
-### Build Commands
-
-```bash
-# Frontend
-cd frontend
-npm run build
-
-# Backend (use process manager like PM2)
-npm install -g pm2
-pm2 start server.js --name wandermates-api
-```
-
-## 🎯 Future Enhancements (Not in MVP)
-
-- Wave Journey Matching System
-- AI Travel Planner
-- Vendor Marketplace
-- Chat/Messaging System
-- Photo uploads to journal entries
-- Voice notes for journal
-- Email verification
-- Phone verification
-- Advanced search filters
-- Push notifications
-- Mobile app (React Native)
-
-## 📄 License
-
-This is a portfolio/demo project. 
-
-## 🤝 Support
-
-For issues or questions:
-1. Check the troubleshooting section
-2. Review API documentation
-3. Check browser console for errors
-4. Check backend logs for server errors
-
-## 🎉 Demo Features to Try
-
-1. **Create an activity** near your location
-2. **RSVP to sample activities** in Rishikesh
-3. **Add journal entries** for places you've visited
-4. **Edit your profile** with bio and interests
-5. **Test gender filters** to see how visibility changes
-6. **Watch real-time updates** when activities are created
-
----
-
-**Built with ❤️ for travelers, by travelers**

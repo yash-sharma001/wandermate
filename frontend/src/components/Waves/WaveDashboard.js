@@ -1,250 +1,149 @@
-import React, { useState, useEffect } from 'react';
-import { Car, Search, PlusCircle, User, Clock, ShieldCheck } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import './WaveDashboard.css';
-import api from '../../utils/api';
-
-import WaveSearchForm from './WaveSearchForm';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowUpDown, Search, Car, Check, Lock, ShieldCheck, Calendar, User } from 'lucide-react';
+import { wavesAPI } from '../../utils/api';
+import { initials } from '../../utils/activityTypes';
 import HostWaveForm from './HostWaveForm';
 import MyWaves from './MyWaves';
+import './Waves.css';
 
-function WaveDashboard({ user }) {
-  const [activeTab, setActiveTab] = useState('search');
-  const [searchResults, setSearchResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+const TABS = [['search', 'Find a ride'], ['host', 'Host a wave'], ['my-waves', 'My travels']];
+const inr = (n) => `₹${Math.round(Number(n)).toLocaleString('en-IN')}`;
+const timeOf = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-  useEffect(() => {
-    fetchWaves({});
-  }, []);
+const Route = ({ wave }) => (
+  <div className="route">
+    <span className="rail"><i className="from" /><i className="line" /><i className="to" /></span>
+    <span className="stops"><b>{timeOf(wave.departure_time)} · {wave.origin_name}</b><b>{wave.destination_name}</b></span>
+  </div>
+);
 
-  const fetchWaves = async (params) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get('/waves', { params });
-      setSearchResults(res.data);
-    } catch (err) {
-      setError('Failed to load waves');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleJoinRequest = async (waveId, seatsRequested) => {
-    try {
-      await api.post(`/waves/${waveId}/join`, { seats_requested: seatsRequested });
-      alert('Request sent to host!');
-      setActiveTab('my-waves');
-    } catch (error) {
-      alert(error.response?.data?.error || 'Failed to request join');
-    }
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
-  };
-
+function WaveCard({ wave, user, seats, onRequest, busy }) {
+  const isHost = wave.host_id === user.id;
+  const left = wave.capacity - wave.current_travelers;
   return (
-    <div className="wave-page-wrapper">
-      <div className="wave-dashboard-container">
-        
-        {/* Header Section */}
-        <header className="page-header">
-          <div className="header-badge btn-modern-primary">
-             <Car size={16} />
-             <span>WanderWave</span>
-          </div>
-          <h1>Waves Community</h1>
-          <p>Split fares, share stories, and reach your destination together.</p>
-        </header>
-
-        {/* Tab Navigation */}
-        <nav className="wave-tab-nav">
-          {[
-            { id: 'search', label: 'Explore Rides', icon: Search },
-            { id: 'host', label: 'Host a Wave', icon: PlusCircle },
-            { id: 'my-waves', label: 'My Travels', icon: User }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <tab.icon size={18} />
-              <span>{tab.label}</span>
-              {activeTab === tab.id && (
-                <motion.div layoutId="wave-active-pill" className="active-pill" />
-              )}
-            </button>
-          ))}
-        </nav>
-
-        {/* Dynamic Content Area */}
-        <div className="wave-main-content">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-            >
-              {activeTab === 'search' && (
-                <div className="search-layout">
-                  <header className="search-header-pod">
-                    <WaveSearchForm onSearch={fetchWaves} />
-                  </header>
-                  
-                  <main className="results-grid">
-                    <div className="results-header">
-                       <h2>Live Waves</h2>
-                       <span>{searchResults.length} nearby rides found</span>
-                    </div>
-
-                    {loading && (
-                      <div className="loading-state">
-                        <div className="spinner-modern"></div>
-                        <p>Scanning the horizon...</p>
-                      </div>
-                    )}
-
-                    {error && <div className="error-card">⚠️ {error}</div>}
-                    
-                    {!loading && !error && searchResults.length === 0 && (
-                      <div className="empty-state">
-                        <Car size={64} />
-                        <p>No waves in this area yet.<br/>Be the first to host one!</p>
-                      </div>
-                    )}
-                    
-                    {!loading && (
-                      <div className="cards-stack">
-                        {searchResults.map((wave, idx) => (
-                          <WaveCard 
-                            key={wave.id} 
-                            wave={wave} 
-                            onJoin={handleJoinRequest} 
-                            currentUser={user} 
-                            delay={idx * 0.05}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </main>
-                </div>
-              )}
-
-              {activeTab === 'host' && (
-                <div className="form-center-layout">
-                   <div className="glass-card-modern" style={{ maxWidth: '800px', margin: '0 auto' }}>
-                      <HostWaveForm user={user} onSuccess={() => {
-                        alert('Wave created successfully!');
-                        setActiveTab('my-waves');
-                      }} />
-                   </div>
-                </div>
-              )}
-
-              {activeTab === 'my-waves' && (
-                <MyWaves user={user} />
-              )}
-            </motion.div>
-          </AnimatePresence>
+    <div className="card wave-card">
+      <Route wave={wave} />
+      <div className="who">
+        <span className="avatar violet">{initials(wave.host_name)}</span>
+        <div>
+          <b>{wave.host_name} <ShieldCheck size={14} color="var(--violet)" style={{ verticalAlign: '-2px' }} /></b>
+          <div className="muted small">{[wave.car_model, wave.car_number].filter(Boolean).join(' · ') || 'Car details on request'}</div>
         </div>
       </div>
+      <span className={`tag ${left <= 1 ? 'amber' : 'mint'}`}>{left} seat{left === 1 ? '' : 's'} left</span>
+      <div className="price"><b>{inr(wave.price_per_seat)}</b><span className="muted small">per seat</span></div>
+      {isHost ? <span className="tag plain">You're hosting</span> : (
+        <button className="btn primary" disabled={left < seats || busy === wave.id} onClick={() => onRequest(wave.id)}>
+          {busy === wave.id ? 'Sending…' : left < seats ? 'Not enough seats' : 'Request'}
+        </button>
+      )}
     </div>
   );
 }
 
-function WaveCard({ wave, onJoin, currentUser, delay }) {
-  const [seatsRequested, setSeatsRequested] = useState(1);
-  const isHost = currentUser && currentUser.id === wave.host_id;
-  
-  const seatsAvailable = wave.capacity - wave.current_travelers;
-  const price = parseFloat(wave.price_per_seat);
-  const totalWithFee = price + (price * 0.1); 
+function WaveDashboard({ user }) {
+  const [tab, setTab] = useState('search');
+  const [params, setParams] = useState({ origin: '', destination: '', date: '', seats: 1 });
+  const [waves, setWaves] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(null);
+
+  const fetchWaves = useCallback(async (p) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await wavesAPI.getAll({ origin: p.origin, destination: p.destination, date: p.date });
+      setWaves(res.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load waves');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchWaves({}); }, [fetchWaves]);
+
+  const request = async (id) => {
+    setBusy(id);
+    setError('');
+    setNotice('');
+    try {
+      await wavesAPI.join(id, { seats_requested: params.seats });
+      setNotice('Request sent to the host. Track it under My travels.');
+      fetchWaves(params);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to request join');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const verified = {
+    email: user.email_verified === 1, phone: user.phone_verified === 1, id: user.aadhaar_status === 'verified',
+  };
+  const set = (patch) => setParams((p) => ({ ...p, ...patch }));
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay, duration: 0.4 }}
-      className="wave-entry-card glass-card"
-    >
-      <div className="entry-main">
-        <div className="entry-route">
-          <div className="route-stop">
-            <span className="dot start" />
-            <span>{wave.origin_name}</span>
-          </div>
-          <div className="route-line" />
-          <div className="route-stop">
-             <span className="dot end" />
-             <span>{wave.destination_name}</span>
-          </div>
+    <>
+      <div className="page-head">
+        <div>
+          <div className="row" style={{ gap: 10 }}><h1>Waves</h1><span className="tag amber">ride-share</span></div>
+          <p>Share rides with verified travelers and split the fare.</p>
         </div>
-
-        <div className="entry-meta">
-           <div className="meta-info">
-             <Clock size={16} />
-             <span>{new Date(wave.departure_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
-           </div>
-           <div className="meta-info">
-             <Car size={16} />
-             <span>{wave.car_model || 'Standard Trip'}</span>
-           </div>
-           {wave.current_travelers > 0 && (
-             <div className="meta-info traveller-count">
-               <User size={14} />
-               <span>{wave.current_travelers} Joined</span>
-             </div>
-           )}
-        </div>
-
-        <div className="entry-host">
-           <div className="host-v-avatar">
-              {wave.host_name?.charAt(0) || 'U'}
-           </div>
-           <div className="host-v-details">
-              <span className="name">{wave.host_name}</span>
-              <span className="trust"><ShieldCheck size={12} /> {wave.trust_score || 95}% Verified</span>
-           </div>
+        <div className="tabs" role="tablist">
+          {TABS.map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>)}
         </div>
       </div>
 
-      <div className="entry-action">
-        <div className="price-tag">
-           <span className="amount">₹{Math.round(totalWithFee)}</span>
-           <span className="label">EST. FARE</span>
-        </div>
+      {tab === 'search' && (
+        <>
+          <form className="card search-card" onSubmit={(e) => { e.preventDefault(); fetchWaves(params); }}>
+            <label className="cell"><span className="dot from" /><small>From</small>
+              <input value={params.origin} onChange={(e) => set({ origin: e.target.value })} placeholder="Tapovan, Rishikesh" /></label>
+            <button type="button" className="icon-btn swap" aria-label="Swap" onClick={() => set({ origin: params.destination, destination: params.origin })}><ArrowUpDown size={16} /></button>
+            <label className="cell"><span className="dot to" /><small>To</small>
+              <input value={params.destination} onChange={(e) => set({ destination: e.target.value })} placeholder="Jolly Grant Airport, Dehradun" /></label>
+            <label className="cell narrow"><Calendar size={15} /><small>Date</small>
+              <input type="date" value={params.date} onChange={(e) => set({ date: e.target.value })} /></label>
+            <label className="cell narrow"><User size={15} /><small>Seats</small>
+              <input type="number" min="1" max="8" value={params.seats} onChange={(e) => set({ seats: Math.max(1, Number(e.target.value) || 1) })} /></label>
+            <button className="btn primary"><Search size={16} /> Search rides</button>
+          </form>
 
-        <div className="seats-indicator">
-          {seatsAvailable} seats open
-        </div>
+          <div className="waves-layout">
+            <section>
+              <div className="row between" style={{ margin: '4px 0 12px' }}>
+                <h2>Live waves</h2><span className="muted small">{waves.length} ride{waves.length === 1 ? '' : 's'}</span>
+              </div>
+              {notice && <div className="alert success" style={{ marginBottom: 12 }}><Check size={18} />{notice}</div>}
+              {error && <div className="alert" style={{ marginBottom: 12 }}>{error}</div>}
+              {loading ? <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
+                : waves.length === 0 ? <div className="card empty"><Car size={40} /><h3>No waves match yet</h3><p>Try other places or dates, or host one yourself.</p></div>
+                : <div className="stack">{waves.map((w) => <WaveCard key={w.id} wave={w} user={user} seats={params.seats} onRequest={request} busy={busy} />)}</div>}
+            </section>
 
-        {!isHost && seatsAvailable > 0 && (
-          <div className="entry-request-box">
-             <div className="seats-picker">
-                <button onClick={() => setSeatsRequested(Math.max(1, seatsRequested - 1))}>-</button>
-                <span>{seatsRequested}</span>
-                <button onClick={() => setSeatsRequested(Math.min(seatsAvailable, seatsRequested + 1))}>+</button>
-             </div>
-             <button className="btn-modern btn-modern-primary btn-full" onClick={() => onJoin(wave.id, seatsRequested)}>
-                Book Now →
-             </button>
+            <aside className="promo">
+              <span className="icon-tile amber"><Car size={22} /></span>
+              <h2>Driving somewhere?</h2>
+              <p>Host a wave and earn back your fuel. Hosting unlocks once your ID is verified.</p>
+              <ul>
+                <li className={verified.email ? 'ok' : ''}><Check size={16} /> Email verified</li>
+                <li className={verified.phone ? 'ok' : ''}><Check size={16} /> Phone verified</li>
+                <li className={verified.id ? 'ok' : 'todo'}>{verified.id ? <Check size={16} /> : <Lock size={16} />} Aadhaar ID {verified.id ? 'verified' : '— needed to host'}</li>
+              </ul>
+              {verified.id ? <button className="btn amber block" onClick={() => setTab('host')}>Host a wave</button>
+                : <Link to="/profile" className="btn amber block">Verify my ID</Link>}
+            </aside>
           </div>
-        )}
+        </>
+      )}
 
-        {isHost && (
-          <div className="host-own-tag">
-             <span>You are hosting this</span>
-          </div>
-        )}
-      </div>
-    </motion.div>
+      {tab === 'host' && <HostWaveForm user={user} onSuccess={() => setTab('my-waves')} />}
+      {tab === 'my-waves' && <MyWaves user={user} />}
+    </>
   );
 }
 

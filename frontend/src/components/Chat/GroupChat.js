@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../../utils/api';
-import { Send, User, Clock, ShieldCheck } from 'lucide-react';
+import { Send, ShieldCheck, Receipt, ArrowRightLeft } from 'lucide-react';
+import { chatAPI } from '../../utils/api';
+import { money, methodLabel } from '../../utils/money';
+import { initials } from '../../utils/activityTypes';
 import './GroupChat.css';
 
 function GroupChat({ type, id, user }) {
@@ -9,126 +11,101 @@ function GroupChat({ type, id, user }) {
   const [chatRoomId, setChatRoomId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const ws = useRef(null);
   const scrollRef = useRef(null);
 
+  // Open the chat (members only), then stay subscribed: Hasura pushes the message list on every change
   useEffect(() => {
-    fetchHistory();
-    setupWebSocket();
-
-    return () => {
-      if (ws.current) ws.current.close();
-    };
+    let unsubscribe = () => {};
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const chatId = await chatAPI.open(type, id);
+        if (cancelled) return;
+        setChatRoomId(chatId);
+        unsubscribe = chatAPI.subscribe(chatId, setMessages, () => setError('Chat connection lost'));
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to load chat');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; unsubscribe(); };
   }, [type, id]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const fetchHistory = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get(`/chat/group/${type}/${id}`);
-      setMessages(res.data.messages);
-      setChatRoomId(res.data.chatRoomId);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load chat');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const setupWebSocket = () => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socketUrl = `${protocol}//${window.location.hostname}:5000`;
-    ws.current = new WebSocket(socketUrl);
-
-    ws.current.onopen = () => {
-      // Auth with WS
-      ws.current.send(JSON.stringify({ type: 'auth', userId: user.id }));
-      // Join Room
-      ws.current.send(JSON.stringify({ type: 'join_room', roomId: `${type}_${id}` }));
-    };
-
-    ws.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'new_group_message') {
-        setMessages((prev) => [...prev, data.message]);
-      }
-    };
-  };
-
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    if (!text.trim()) return;
-
-    const messagePayload = {
-      type: 'group_message',
-      roomId: `${type}_${id}`,
-      chatRoomId,
-      text: text.trim()
-    };
-
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(messagePayload));
-      setText('');
+    if (!text.trim() || !chatRoomId) return;
+    const body = text.trim();
+    setText('');
+    try {
+      await chatAPI.send(chatRoomId, body);
+    } catch (err) {
+      setText(body);
+      setError(err.response?.data?.error || 'Failed to send message');
     }
   };
 
-  if (loading) return <div className="chat-loading">Loading chat...</div>;
-  if (error) return <div className="chat-error">{error}</div>;
+  if (loading) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>;
+  if (error && !chatRoomId) return <div className="alert">{error}</div>;
 
   return (
-    <div className="group-chat-container">
-      <div className="chat-header">
-        <h3><ShieldCheck size={18} /> Trip Group Chat</h3>
-        <p>Private & Secure</p>
-      </div>
-
+    <div className="chat card">
+      <div className="chat-head"><ShieldCheck size={18} /> <b>Trip group chat</b> <span className="muted small">Only members can see this</span></div>
       <div className="chat-messages" ref={scrollRef}>
         {messages.length === 0 ? (
-          <div className="empty-chat">
-            <p>No messages yet. Say hi to your fellow travelers!</p>
-          </div>
-        ) : (
-          messages.map((m, idx) => {
-            const isMe = m.sender_id === user.id;
+          <p className="empty">No messages yet. Say hi to your fellow travelers!</p>
+        ) : messages.map((m) => {
+          const mine = m.sender_id === user.id;
+          const time = new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+          // Expenses and payments from the group's money tab show up here as cards
+          if (m.kind === 'expense' || m.kind === 'settlement') {
+            const e = m.meta || {};
+            const who = (id, name) => (id === user.id ? 'You' : name);
             return (
-              <div key={idx} className={`message-bubble ${isMe ? 'me' : 'them'}`}>
-                {!isMe && (
-                  <div className="sender-avatar">
-                    {m.sender_photo ? (
-                      <img src={`http://localhost:5000${m.sender_photo}`} alt="avatar" />
-                    ) : (
-                      <div className="avatar-placeholder"><User size={12} /></div>
-                    )}
-                  </div>
-                )}
-                <div className="message-content">
-                  {!isMe && <span className="sender-name">{m.sender_name}</span>}
-                  <p>{m.content}</p>
-                  <span className="timestamp">
-                    <Clock size={10} /> {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+              <div key={m.id} className={`event ${m.kind}`}>
+                <span className="icon-tile">{m.kind === 'expense' ? <Receipt size={18} /> : <ArrowRightLeft size={18} />}</span>
+                <div className="grow">
+                  {m.kind === 'expense' ? (
+                    <>
+                      <small className="muted">{mine ? 'You' : m.sender_name} added an expense</small>
+                      <b>{e.description}</b>
+                      <span className="muted small">{who(e.paid_by, e.paid_by_name)} paid · {methodLabel(e.method)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <small className="muted">Payment recorded</small>
+                      <b>{who(e.from_user, e.from_name)} paid {e.to_user === user.id ? 'you' : e.to_name}</b>
+                      <span className="muted small">{methodLabel(e.method)}{e.note ? ` · ${e.note}` : ''}</span>
+                    </>
+                  )}
                 </div>
+                <div className="amt"><b>{money(e.amount)}</b><small className="muted">{time}</small></div>
               </div>
             );
-          })
-        )}
+          }
+          return (
+            <div key={m.id} className={`msg ${mine ? 'mine' : ''}`}>
+              {!mine && (m.sender_photo
+                ? <img className="avatar sm" src={m.sender_photo} alt="" />
+                : <span className="avatar sm violet">{initials(m.sender_name)}</span>)}
+              <div className="bubble">
+                {!mine && <b>{m.sender_name}</b>}
+                <p>{m.content}</p>
+                <small>{new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</small>
+              </div>
+            </div>
+          );
+        })}
       </div>
-
+      {error && <div className="alert" style={{ margin: '0 14px 10px' }}>{error}</div>}
       <form className="chat-input" onSubmit={handleSend}>
-        <input 
-          type="text" 
-          value={text} 
-          onChange={(e) => setText(e.target.value)} 
-          placeholder="Type a message..."
-        />
-        <button type="submit" disabled={!text.trim()}>
-          <Send size={18} />
-        </button>
+        <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a message…" maxLength={2000} />
+        <button className="btn primary" disabled={!text.trim()} aria-label="Send"><Send size={18} /></button>
       </form>
     </div>
   );

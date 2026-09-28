@@ -1,296 +1,159 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { categoryIcon } from '../../utils/categoryIcons';
 import { packagesAPI } from '../../utils/api';
-import { Package, Users, TrendingUp, Plus, Check, X, Clock, MapPin, Edit, Trash2 } from 'lucide-react';
-import './ProviderDashboard.css';
+import { initials } from '../../utils/activityTypes';
+import '../Vendor/Partner.css';
 
-// eslint-disable-next-line
+const CATEGORIES = ['Adventure', 'Trekking', 'Wellness', 'Cultural', 'Wildlife', 'Beach', 'Pilgrimage'];
+const TINT = { Trekking: 'mint', Adventure: 'sky', Wellness: 'pink', Cultural: 'peach', Wildlife: 'mint', Beach: 'sky', Pilgrimage: 'peach' };
+const inr = (n) => `₹${Math.round(Number(n)).toLocaleString('en-IN')}`;
+const greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
+const statusTone = { pending: 'amber', confirmed: 'violet', cancelled: 'plain' };
+const asList = (v) => (Array.isArray(v) ? v : []);
+const day = (d) => new Date(d).toISOString().slice(0, 10);
+
+function PackageModal({ pkg, onClose, onSaved }) {
+  const today = new Date();
+  const [form, setForm] = useState({
+    title: pkg?.title || '', destination: pkg?.destination || '', category: pkg?.category || 'Adventure', price: pkg?.price ?? '',
+    duration_days: pkg?.duration_days ?? 3, max_travelers: pkg?.max_travelers ?? 12,
+    available_from: pkg ? day(pkg.available_from) : day(today), available_to: pkg ? day(pkg.available_to) : day(new Date(today.getFullYear() + 1, today.getMonth(), today.getDate())),
+    description: pkg?.description || '', includes: asList(pkg?.includes).join('\n'), departures: asList(pkg?.departure_dates).join(', '),
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const data = {
+        title: form.title, destination: form.destination, category: form.category, price: form.price,
+        duration_days: parseInt(form.duration_days, 10), max_travelers: parseInt(form.max_travelers, 10),
+        available_from: form.available_from, available_to: form.available_to, description: form.description,
+        includes: form.includes.split('\n').map((s) => s.trim()).filter(Boolean),
+        departure_dates: form.departures.split(/[,\s]+/).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)),
+      };
+      if (pkg) await packagesAPI.update(pkg.id, data); else await packagesAPI.create(data);
+      onSaved();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save trip');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="overlay sheet-bottom" onClick={onClose}>
+      <form className="sheet stack" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+        <div className="sheet-head"><h2>{pkg ? 'Edit trip' : 'New trip'}</h2><button type="button" className="icon-btn sm" onClick={onClose} aria-label="Close"><X size={16} /></button></div>
+        <div className="field"><label htmlFor="pt">Title</label><input id="pt" className="input" required minLength={3} value={form.title} onChange={set('title')} placeholder="Valley of Flowers trek" /></div>
+        <div className="grid-2">
+          <div className="field"><label htmlFor="pd">Destination</label><input id="pd" className="input" required value={form.destination} onChange={set('destination')} /></div>
+          <div className="field"><label htmlFor="pc">Category</label><select id="pc" className="select" value={form.category} onChange={set('category')}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></div>
+        </div>
+        <div className="grid-2">
+          <div className="field"><label htmlFor="pp">Price per person (₹)</label><input id="pp" className="input" type="number" min="0" required value={form.price} onChange={set('price')} /></div>
+          <div className="field"><label htmlFor="pdd">Days</label><input id="pdd" className="input" type="number" min="1" max="90" required value={form.duration_days} onChange={set('duration_days')} /></div>
+        </div>
+        <div className="grid-2">
+          <div className="field"><label htmlFor="pf">Available from</label><input id="pf" className="input" type="date" required value={form.available_from} onChange={set('available_from')} /></div>
+          <div className="field"><label htmlFor="pto">Available to</label><input id="pto" className="input" type="date" required value={form.available_to} onChange={set('available_to')} /></div>
+        </div>
+        <div className="field"><label htmlFor="pdep">Departure dates <span className="muted small">(YYYY-MM-DD, comma separated; optional)</span></label><input id="pdep" className="input" value={form.departures} onChange={set('departures')} placeholder="2026-10-05, 2026-10-19" /></div>
+        <div className="field"><label htmlFor="pm">Max travelers</label><input id="pm" className="input" type="number" min="1" value={form.max_travelers} onChange={set('max_travelers')} /></div>
+        <div className="field"><label htmlFor="pi">What's included <span className="muted small">(one per line)</span></label><textarea id="pi" className="textarea" value={form.includes} onChange={set('includes')} placeholder={'Guide\nMeals\nTransport'} /></div>
+        <div className="field"><label htmlFor="pde">Description</label><textarea id="pde" className="textarea" value={form.description} onChange={set('description')} /></div>
+        {error && <div className="alert">{error}</div>}
+        <button className="btn primary lg block" disabled={saving}>{saving ? 'Saving…' : pkg ? 'Save changes' : 'Publish trip'}</button>
+      </form>
+    </div>
+  );
+}
 
 function ProviderDashboard({ user }) {
   const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editPkg, setEditPkg] = useState(null);
-  const [form, setForm] = useState(getEmptyForm());
-  const [saving, setSaving] = useState(false);
-  // eslint-disable-next-line
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [modal, setModal] = useState(null);
 
-  function getEmptyForm() {
-    return {
-      title: '', description: '', destination: '',
-      destination_latitude: '', destination_longitude: '',
-      duration_days: 3, price: '', max_travelers: 20,
-      includes: '', itinerary_text: '',
-      available_from: '', available_to: '',
-      departure_dates_text: '', category: 'Adventure'
-    };
-  }
-
-  useEffect(() => { fetchData(); }, []);
-
-  const fetchData = async () => {
+  const load = useCallback(async () => {
     try {
-      setLoading(true);
-      const [pkgRes, bookRes] = await Promise.all([
-        packagesAPI.getProviderPackages(),
-        packagesAPI.getProviderBookings()
-      ]);
-      setPackages(pkgRes.data.packages || []);
-      setBookings(bookRes.data.bookings || []);
-    } catch (err) {
-      console.error('Error:', err);
-    } finally { setLoading(false); }
+      const [p, b] = await Promise.all([packagesAPI.getProviderPackages(), packagesAPI.getProviderBookings()]);
+      setPackages(p.data.packages || []);
+      setBookings(b.data.bookings || []);
+    } catch (err) { console.error('Error:', err); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const decide = async (id, status) => {
+    try { await packagesAPI.updateBookingStatus(id, status); load(); } catch (err) { alert(err.response?.data?.error || 'Failed to update booking'); }
+  };
+  const remove = async (id) => {
+    if (!window.confirm('Delete this trip?')) return;
+    try { await packagesAPI.delete(id); load(); } catch (err) { alert('Failed to delete'); }
   };
 
-  const handleBookingStatus = async (id, status) => {
-    try {
-      await packagesAPI.updateBookingStatus(id, status);
-      fetchData();
-    } catch (err) { alert('Failed to update booking'); }
-  };
+  if (loading) return <div className="empty"><div className="spinner" style={{ margin: '60px auto' }} /></div>;
 
-  const pendingBookings = bookings.filter(b => b.status === 'pending');
-  const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
-  const totalRevenue = confirmedBookings.reduce((sum, b) => sum + Number(b.total_price || 0), 0);
-
-  const stats = [
-    { icon: Package, value: packages.length, label: 'Packages', color: 'var(--teal)' },
-    { icon: Clock, value: pendingBookings.length, label: 'Requests', color: 'var(--coral)' },
-    { icon: Check, value: confirmedBookings.length, label: 'Confirmed', color: 'var(--teal)' },
-    { icon: TrendingUp, value: `₹${totalRevenue.toLocaleString()}`, label: 'Revenue', color: 'var(--teal)' },
-  ];
-
-  const openCreate = () => {
-    setEditPkg(null);
-    setForm(getEmptyForm());
-    setError('');
-    setShowCreateModal(true);
-  };
-
-  const openEdit = (pkg) => {
-    // eslint-disable-next-line
-    const parseJSON = (v) => {
-      if (!v) return '';
-      if (typeof v === 'string') {
-        try { const arr = JSON.parse(v); return Array.isArray(arr) ? arr.join('\n') : v; } catch { return v; }
-      }
-      if (Array.isArray(v)) return v.join('\n');
-      return '';
-    };
-
-    setEditPkg(pkg);
-    setForm({
-      title: pkg.title || '',
-      description: pkg.description || '',
-      destination: pkg.destination || '',
-      price: pkg.price?.toString() || '',
-      category: pkg.category || 'Adventure'
-    });
-    setError('');
-    setShowCreateModal(true);
-  };
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setError('');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setError('');
-
-    try {
-      if (editPkg) {
-        await packagesAPI.update(editPkg.id, form);
-      } else {
-        await packagesAPI.create(form);
-      }
-      setShowCreateModal(false);
-      fetchData();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
-    } finally { setSaving(false); }
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Delete this package?')) {
-      try {
-        await packagesAPI.delete(id);
-        fetchData();
-      } catch (err) { alert('Failed to delete'); }
-    }
-  };
-
-  if (loading) return (
-    <div className="provider-dashboard">
-      <div className="loading-wave"><div className="spinner-modern"></div></div>
-    </div>
-  );
+  const pending = bookings.filter((b) => b.status === 'pending').length;
+  const confirmed = bookings.filter((b) => b.status === 'confirmed');
+  const revenue = confirmed.reduce((s, b) => s + Number(b.total_price || 0), 0);
 
   return (
-    <div className="provider-dashboard">
-      <div className="provider-header">
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-          <h1>Package Hub</h1>
-          <p>Hi {user?.full_name}, here is your curation overview.</p>
-        </motion.div>
-        <button className="provider-create-btn" onClick={openCreate}>
-          <Plus size={20} /> New Concept
-        </button>
+    <div className="partner">
+      <div className="page-head">
+        <div><h1>{greeting()}, {user.full_name.split(' ')[0]}</h1><p>Your trips and traveler requests at a glance.</p></div>
+        <button className="btn primary" onClick={() => setModal('new')}><Plus size={16} /> New trip</button>
       </div>
 
-      <div className="provider-body">
-        {/* Stats */}
-        <div className="provider-stats">
-          {stats.map((s, i) => {
-            const Icon = s.icon;
-            return (
-              <motion.div 
-                key={i} 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="provider-stat-card"
-              >
-                <div className="provider-stat-icon" style={{ color: s.color }}>
-                  <Icon size={24} />
-                </div>
-                <div className="provider-stat-value">{s.value}</div>
-                <div className="provider-stat-label">{s.label}</div>
-              </motion.div>
-            );
-          })}
-        </div>
+      <div className="stats4">
+        <div className="stat4"><small>Trips</small><b>{packages.length}</b></div>
+        <div className="stat4 alert-num"><small>Pending requests</small><b>{pending}</b></div>
+        <div className="stat4"><small>Confirmed</small><b>{confirmed.length}</b></div>
+        <div className="stat4"><small>Revenue</small><b>{inr(revenue)}</b></div>
+      </div>
 
-        {/* Tabs */}
-        <div className="provider-tabs">
-          {[
-            { id: 'overview', label: 'Dashboard' },
-            { id: 'packages', label: 'My Concepts' },
-            { id: 'bookings', label: 'Traveler List' }
-          ].map(tab => (
-            <button key={tab.id} className={`provider-tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}>
-              {tab.label}
-              {activeTab === tab.id && <motion.div layoutId="provider-pill" className="active-pill" />}
-            </button>
-          ))}
-        </div>
-
-        {/* Overview tab */}
-        {activeTab === 'overview' && (
-          <AnimatePresence mode="wait">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="tab-content">
-              {/* Pending bookings */}
-              <div className="provider-section">
-                <div className="section-title">
-                  <h2>New Requests</h2>
-                  <span className="section-count">{pendingBookings.length}</span>
-                </div>
-                {pendingBookings.length === 0 ? (
-                  <div className="provider-empty-small">All caught up! No pending requests.</div>
-                ) : (
-                  <div className="provider-booking-list">
-                    {pendingBookings.map(b => (
-                      <motion.div key={b.id} whileHover={{ x: 8 }} className="provider-booking-card">
-                        <div className="pbc-info">
-                          <div className="pbc-title">{b.package_title}</div>
-                          <div className="pbc-meta">
-                            <Users size={12} className="inline mr-1" /> {b.booker_name} · {b.travelers} Persons · <span className="text-teal font-bold">₹{Number(b.total_price).toLocaleString()}</span>
-                          </div>
-                          <div className="pbc-date">
-                            <Clock size={13} /> Requested for {new Date(b.travel_date).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div className="pbc-actions">
-                          <button className="pbc-btn confirm" onClick={() => handleBookingStatus(b.id, 'confirmed')}>
-                            <Check size={14} /> Accept
-                          </button>
-                          <button className="pbc-btn decline" onClick={() => handleBookingStatus(b.id, 'cancelled')}>
-                            <X size={14} /> Decline
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        )}
-
-        {/* Packages tab */}
-        {activeTab === 'packages' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="provider-section">
-            {packages.length === 0 ? (
-              <div className="provider-empty">
-                <Package size={48} strokeWidth={1} />
-                <h3>No Packages Found</h3>
-                <button className="btn-modern btn-modern-primary" onClick={openCreate}><Plus size={16} /> Create Now</button>
-              </div>
-            ) : (
-              <div className="provider-pkg-grid">
-                {packages.map(pkg => (
-                  <div key={pkg.id} className="provider-pkg-full-card">
-                    <div className="ppfc-header">
-                      <div className="ppfc-category">{pkg.category}</div>
-                      <div className="ppfc-actions">
-                        <button className="ppfc-btn" onClick={() => openEdit(pkg)}><Edit size={14} /></button>
-                        <button className="ppfc-btn danger" onClick={() => handleDelete(pkg.id)}><Trash2 size={14} /></button>
-                      </div>
-                    </div>
-                    <h3>{pkg.title}</h3>
-                    <div className="ppfc-meta">
-                      <span><MapPin size={13} /> {pkg.destination}</span>
-                    </div>
-                    <div className="ppfc-footer">
-                      <span className="ppfc-price">₹{Number(pkg.price).toLocaleString()}</span>
-                    </div>
-                  </div>
+      <div className="cols">
+        <section className="card">
+          <h2 style={{ marginBottom: 6 }}>Traveler requests</h2>
+          {bookings.length === 0 ? <p className="empty">No bookings yet.</p> : (
+            <table>
+              <thead><tr><th>Traveler</th><th>Trip</th><th>Date</th><th>Travelers</th><th>Action</th></tr></thead>
+              <tbody>
+                {bookings.map((b) => (
+                  <tr key={b.id}>
+                    <td><span className="who"><span className="avatar sm">{initials(b.booker_name)}</span>{b.booker_name}</span></td>
+                    <td>{b.package_title}</td>
+                    <td>{new Date(b.travel_date).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}</td>
+                    <td>{b.travelers}</td>
+                    <td>{b.status === 'pending'
+                      ? <span className="row" style={{ justifyContent: 'flex-end', gap: 8 }}><button className="btn sm" onClick={() => decide(b.id, 'cancelled')}>Decline</button><button className="btn sm primary" onClick={() => decide(b.id, 'confirmed')}>Accept</button></span>
+                      : <span className={`tag ${statusTone[b.status] || 'plain'}`}>{b.status === 'confirmed' ? 'Accepted' : b.status === 'cancelled' ? 'Declined' : b.status}</span>}</td>
+                  </tr>
                 ))}
-              </div>
-            )}
-          </motion.div>
-        )}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        <section className="card stack">
+          <h2>Your trips</h2>
+          {packages.map((p) => (
+            <div className="exp" key={p.id}>
+              <span className={`ph ${TINT[p.category] || ''}`}>{p.image_url ? <img src={p.image_url} alt="" /> : React.createElement(categoryIcon(p.category), { size: 22 })}</span>
+              <div className="grow"><b>{p.title}</b><div className="muted small">{p.category} · {inr(p.price)} · {p.duration_days}d</div></div>
+              <button className="icon-btn sm" aria-label={`Edit ${p.title}`} onClick={() => setModal(p)}><Pencil size={14} /></button>
+              <button className="icon-btn sm" aria-label={`Delete ${p.title}`} onClick={() => remove(p.id)}><Trash2 size={14} /></button>
+            </div>
+          ))}
+          <button className="add-dashed" onClick={() => setModal('new')}><Plus size={16} style={{ verticalAlign: '-3px' }} /> Add another trip</button>
+        </section>
       </div>
 
-      {/* Create/Edit Modal */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <div className="provider-modal-overlay" onClick={() => setShowCreateModal(false)}>
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="provider-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="provider-modal-header">
-                <h2>{editPkg ? 'Refine Concept' : 'New Concept'}</h2>
-                <button className="provider-modal-close" onClick={() => setShowCreateModal(false)}><X size={18} /></button>
-              </div>
-              <form onSubmit={handleSubmit}>
-                <div className="provider-modal-body">
-                  <div className="form-group mb-4">
-                    <label className="form-label block mb-2">TITLE *</label>
-                    <input type="text" name="title" className="form-input" value={form.title}
-                      onChange={handleChange} required />
-                  </div>
-                   <div className="form-group mb-4">
-                    <label className="form-label block mb-2">PRICE *</label>
-                    <input type="number" name="price" className="form-input" value={form.price}
-                      onChange={handleChange} required />
-                  </div>
-                </div>
-                <div className="provider-modal-actions">
-                  <button type="button" className="btn-modern btn-modern-secondary" onClick={() => setShowCreateModal(false)}>Discard</button>
-                  <button type="submit" className="btn-modern btn-modern-primary" disabled={saving}>
-                    {saving ? 'Transmitting...' : 'Launch'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {modal && <PackageModal pkg={modal === 'new' ? null : modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
     </div>
   );
 }

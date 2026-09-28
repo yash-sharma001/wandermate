@@ -1,0 +1,5 @@
+{
+  "name": "wandermate",
+  "private": true,
+  "workspaces": ["packages/*", "services/*"]
+}
