@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, ShieldCheck, Check, X, MapPin, Clock, Users, Minus, Plus, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck, Check, X, MapPin, Clock, Users, Minus, Plus, Search } from 'lucide-react';
 import { categoryIcon } from '../../utils/categoryIcons';
 import { packagesAPI } from '../../utils/api';
 import './TravelPackages.css';
@@ -78,6 +79,12 @@ function TravelPackages({ userLocation }) {
       <div className="page-head"><div><h1>Trips</h1><p>Multi-day trips from verified operators.</p></div>
         <div className="input-icon trips-search"><Search size={18} /><input className="input" placeholder="Search trips or places" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
       </div>
+
+      <Link to="/itinerary" className="card row between" style={{ textDecoration: 'none', color: 'inherit', marginBottom: 14 }}>
+        <span className="row" style={{ gap: 12 }}><span className="icon-tile violet"><Sparkles size={20} /></span>
+          <span><b>Plan your own trip</b><span className="muted small" style={{ display: 'block' }}>Get a day-by-day itinerary for any destination.</span></span></span>
+        <ChevronRight size={18} />
+      </Link>
 
       <div className="card cal">
         <div className="row between">

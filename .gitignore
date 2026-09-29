@@ -44,3 +44,6 @@ coverage/
 # PM2
 .pm2/
 .gstack/
+
+# Database backups made by ./run.sh upgrade-db
+backup-*.sql

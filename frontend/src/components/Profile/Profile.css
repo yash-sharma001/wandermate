@@ -1,7 +1,7 @@
 .profile-grid { display: grid; grid-template-columns: 330px 1fr; gap: 24px; align-items: start; }
 .profile-card { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 12px; text-align: center; overflow: hidden; }
 .profile-card .banner { height: 88px; margin: 0 -20px; background: var(--amber-200); }
-.big-avatar { width: 104px; height: 104px; border-radius: 28px; background: var(--violet); color: #fff; margin: -52px auto 0; border: 5px solid #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font-head); font-weight: 800; font-size: 36px; object-fit: cover; }
+.big-avatar { width: 104px; height: 104px; border-radius: 28px; background: var(--violet); color: #fff; margin: -52px auto 0; border: 5px solid #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font-head); font-weight: 500; font-size: 36px; object-fit: cover; }
 .profile-card h2 { font-size: 26px; }
 .profile-card .bio { color: var(--ink); }
 .eyebrow { color: var(--violet); font-weight: 800; letter-spacing: .08em; font-size: 12px; }

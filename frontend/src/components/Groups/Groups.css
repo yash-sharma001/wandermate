@@ -32,7 +32,7 @@
 .transfer { padding: 8px 0; border-top: 1.5px solid var(--line); }
 .transfer:first-of-type { border-top: 0; }
 
-.big-amount { font-family: var(--font-head); font-size: 28px; font-weight: 800; }
+.big-amount { font-family: var(--font-head); font-size: 28px; font-weight: 500; }
 .split-row { padding: 6px 4px; }
 .split-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--violet); }
 .split-row .amt { width: 110px; padding: 8px 10px; }

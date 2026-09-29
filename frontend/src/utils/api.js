@@ -8,24 +8,49 @@ const API_URL = process.env.REACT_APP_API_URL ?? '';
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // the refresh token lives in an httpOnly cookie
 });
 
+// The short-lived access token is kept in memory only (not localStorage, so XSS can't read it)
+let accessToken = null;
+export const setToken = (t) => { accessToken = t; };
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   return config;
 });
 
 const logoutLocally = () => {
-  localStorage.removeItem('token');
+  accessToken = null;
   localStorage.removeItem('user');
   window.location.href = '/login';
 };
 
+// Trades the refresh cookie for a new access token. One call at a time: refresh tokens are single-use.
+let refreshing;
+export const refreshSession = () => {
+  refreshing ||= axios.post(`${API_URL}/api/auth/refresh`, null, { withCredentials: true })
+    .then(({ data }) => { accessToken = data.token; return data; })
+    .finally(() => { refreshing = null; });
+  return refreshing;
+};
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) logoutLocally();
+  async (error) => {
+    const { config, response } = error;
+    // Expired access token: refresh once and replay (auth routes handle their own 401s, e.g. wrong password)
+    if (response?.status === 401 && !config._retried && !config.url.startsWith('/auth/')) {
+      config._retried = true;
+      try {
+        await refreshSession();
+        config.headers.Authorization = `Bearer ${accessToken}`;
+        return api(config);
+      } catch (e) {
+        if (e.response?.status !== 401) throw error; // refresh unreachable: keep the session, surface the original error
+      }
+      logoutLocally();
+    }
     return Promise.reject(error);
   }
 );
@@ -39,20 +64,19 @@ const fail = (message, status = 400) => {
   return err;
 };
 
-const authHeaders = () => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+const authHeaders = () => (accessToken ? { Authorization: `Bearer ${accessToken}` } : {});
 
 const PERMISSION_DENIED = 'check constraint of an insert/update permission has failed';
 
 // `denied` = friendly message for when Hasura's insert/update permission check rejects the row
 export const gql = async (query, variables = {}, { denied } = {}) => {
-  const res = await fetch(`${API_URL}/v1/graphql`, {
+  const send = () => fetch(`${API_URL}/v1/graphql`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ query, variables }),
   });
+  let res = await send();
+  if (res.status === 401 && await refreshSession().then(() => true, () => false)) res = await send();
   if (res.status === 401) {
     logoutLocally();
     throw fail('Session expired', 401);
@@ -110,8 +134,15 @@ const ok = (data) => ({ data });
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
-  // token captured now: callers clear localStorage right after calling this
-  logout: () => api.post('/auth/logout', null, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+  // token captured now: callers clear it right after calling this
+  logout: () => api.post('/auth/logout', null, { headers: { Authorization: `Bearer ${accessToken}` } }),
+  forgotPassword: (email) => api.post('/auth/forgot', { email }),
+  resetPassword: (token, password) => api.post('/auth/reset', { token, password }),
+};
+
+// ---------- AI (Python service, via the API) ----------
+export const aiAPI = {
+  itinerary: (data) => api.post('/ai/itinerary', data),
 };
 
 // ---------- Activities ----------
@@ -624,8 +655,8 @@ export const safetyAPI = {
   },
 
   verifyEmailOTP: async ({ code }) => {
-    await gql(`mutation($code: String!) { verify_email_otp(args: {p_code: $code}) { id } }`, { code });
-    return ok({ message: 'Email verified successfully!' });
+    const d = await gql(`mutation($code: String!) { verifyEmailOtp(code: $code) { message } }`, { code });
+    return ok({ message: d.verifyEmailOtp.message });
   },
 
   addReview: async ({ user_id, rating, comment, entity_type, entity_id, entity_title }) => {
@@ -850,7 +881,11 @@ const subscriptions = () => {
     const base = API_URL || `${window.location.protocol}//${window.location.host}`;
     wsClient = createClient({
       url: `${base.replace(/^http/, 'ws')}/v1/graphql`,
-      connectionParams: () => ({ headers: authHeaders() }),
+      // reconnects can happen long after the 15-minute access token expired
+      connectionParams: async () => {
+        await refreshSession().catch(() => {});
+        return { headers: authHeaders() };
+      },
     });
   }
   return wsClient;

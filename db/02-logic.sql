@@ -5,12 +5,10 @@ CREATE FUNCTION uid(s json) RETURNS int LANGUAGE sql IMMUTABLE AS $$
   SELECT nullif(s ->> 'x-hasura-user-id', '')::int
 $$;
 
--- Great-circle distance in metres (clamped so float rounding never makes acos() fail)
+-- Great-circle distance in metres, computed by PostGIS (spherical earth, same model as the old hand-written formula)
 CREATE FUNCTION haversine(lat1 float8, lng1 float8, lat2 float8, lng2 float8) RETURNS float8
 LANGUAGE sql IMMUTABLE AS $$
-  SELECT 6371000 * acos(least(1, greatest(-1,
-    cos(radians(lat1)) * cos(radians(lat2)) * cos(radians(lng2) - radians(lng1)) +
-    sin(radians(lat1)) * sin(radians(lat2)))))
+  SELECT ST_DistanceSphere(ST_MakePoint(lng1, lat1), ST_MakePoint(lng2, lat2))
 $$;
 
 -- =============================================
@@ -194,6 +192,7 @@ WHERE wr.status = 'approved';
 -- QUERY FUNCTIONS (STABLE -> GraphQL queries)
 -- =============================================
 
+-- (replaced by an index-backed version in 05-geo-index.sql)
 CREATE FUNCTION nearby_activities(p_lat float8, p_lng float8, p_radius int DEFAULT 10000, p_gender text DEFAULT NULL)
 RETURNS SETOF activity_details LANGUAGE sql STABLE AS $$
   SELECT * FROM activity_details a
@@ -420,19 +419,7 @@ BEGIN
        OR (p_type = 'group' AND trip_group_id = p_reference_id);
 END $$;
 
--- Verification
-CREATE FUNCTION verify_email_otp(p_code text, hasura_session json DEFAULT NULL)
-RETURNS SETOF users LANGUAGE plpgsql AS $$
-DECLARE v_uid int := uid(hasura_session); v_email text;
-BEGIN
-  SELECT email INTO v_email FROM user_email_verifications
-  WHERE user_id = v_uid AND code = p_code AND expires_at > now();
-  IF v_email IS NULL THEN RAISE EXCEPTION 'Invalid or expired verification code' USING ERRCODE = 'check_violation'; END IF;
-  UPDATE users SET email_verified = 1, trust_score = least(100, trust_score + 10) WHERE id = v_uid AND email = v_email;
-  DELETE FROM user_email_verifications WHERE user_id = v_uid;
-  RETURN QUERY SELECT * FROM users WHERE id = v_uid;
-END $$;
-
+-- Verification (email/phone OTP checks live in the actions service, which rate-limits guesses)
 CREATE FUNCTION submit_aadhaar(p_aadhaar_number text, p_aadhaar_name text, p_aadhaar_url text, p_photo_url text, hasura_session json DEFAULT NULL)
 RETURNS SETOF users LANGUAGE plpgsql AS $$
 DECLARE v_uid int := uid(hasura_session); u users%ROWTYPE;

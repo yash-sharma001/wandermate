@@ -1,16 +1,13 @@
+// Event-bus consumers, run by worker.js (not by the API process)
 const nodemailer = require('nodemailer');
 const mq = require('@wandermate/common/mq');
 const formatPhone = require('@wandermate/common/phone');
+const twilio = require('../../lib/twilio');
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
 });
-
-const sid = process.env.TWILIO_ACCOUNT_SID;
-const twilio = sid && sid.startsWith('AC') && process.env.TWILIO_AUTH_TOKEN !== 'your_token'
-  ? require('twilio')(sid, process.env.TWILIO_AUTH_TOKEN)
-  : null;
 
 // { to, subject, html }
 mq.work('mail', (m) => transporter.sendMail({ from: process.env.EMAIL_FROM, ...m }));
@@ -27,5 +24,3 @@ mq.work('sos', async ({ contacts, body }) => {
   }));
   results.filter((r) => r.status === 'rejected').forEach((r) => console.error('SOS send failed:', r.reason.message));
 });
-
-console.log('worker up');

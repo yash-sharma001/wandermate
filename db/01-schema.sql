@@ -1,5 +1,10 @@
 -- WanderMates schema (PostgreSQL). Flags stay SMALLINT 0/1 so API payloads match the old app.
 
+-- pgvector: embeddings for the AI layer (recommendations); no separate vector DB needed yet
+CREATE EXTENSION IF NOT EXISTS vector;
+-- PostGIS: geo distance (see haversine() in 02-logic.sql)
+CREATE EXTENSION IF NOT EXISTS postgis;
+
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,

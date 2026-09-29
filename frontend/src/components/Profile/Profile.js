@@ -16,7 +16,7 @@ const TrustRing = ({ level }) => {
       <circle cx="55" cy="55" r={r} fill="none" stroke="var(--cream-2)" strokeWidth="10" />
       <circle cx="55" cy="55" r={r} fill="none" stroke="var(--violet)" strokeWidth="10" strokeLinecap="round"
         strokeDasharray={c} strokeDashoffset={c * (1 - level / 3)} transform="rotate(-90 55 55)" />
-      <text x="55" y="56" textAnchor="middle" fontFamily="var(--font-head)" fontWeight="800" fontSize="30" fill="var(--ink)">{level}</text>
+      <text x="55" y="56" textAnchor="middle" fontFamily="var(--font-head)" fontWeight="500" fontSize="30" fill="var(--ink)">{level}</text>
       <text x="55" y="74" textAnchor="middle" fontSize="11" fill="var(--muted)">of 3</text>
     </svg>
   );

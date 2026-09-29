@@ -82,6 +82,7 @@ function Login({ onLogin }) {
               <button type="button" className="suffix" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button>
             </div>
           </div>
+          <p className="auth-foot" style={{ textAlign: 'right', margin: '0 0 12px' }}><Link to="/forgot-password">Forgot password?</Link></p>
           <button className="btn primary lg block" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
           <p className="auth-foot">New to WanderMates? <Link to="/register"><b>Create an account</b></Link></p>
         </form>

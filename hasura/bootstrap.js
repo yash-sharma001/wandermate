@@ -2,7 +2,8 @@
 // actions, event triggers) and applies it with replace_metadata. Idempotent: safe to re-run.
 const HASURA = process.env.HASURA_URL || 'http://hasura:8080';
 const SECRET = process.env.HASURA_GRAPHQL_ADMIN_SECRET;
-const ACTIONS_URL = process.env.ACTIONS_URL || 'http://actions:5002';
+const API_URL = process.env.API_URL || 'http://api:5000';
+const AI_URL = process.env.AI_URL || 'http://ai:8000';
 
 const X = 'X-Hasura-User-Id';
 const ME = { _eq: X };
@@ -27,6 +28,14 @@ const sel = (filter = {}, columns = '*') => ({ role: 'user', permission: { colum
 const objRel = (name, column) => ({ name, using: { foreign_key_constraint_on: column } });
 const arrRel = (name, table, column) => ({ name, using: { foreign_key_constraint_on: { table: T(table), column } } });
 
+// Keeps the AI service's embeddings (pgvector, used for itinerary retrieval) in step with these tables
+const embedTrigger = (name, updateColumns) => ({
+  name,
+  definition: { enable_manual: false, insert: { columns: '*' }, update: { columns: updateColumns }, delete: { columns: '*' } },
+  retry_conf: { num_retries: 5, interval_sec: 10, timeout_sec: 60 },
+  webhook: `${AI_URL}/events/embed`,
+});
+
 const tables = [];
 const table = (name, cfg = {}) => tables.push({ table: T(name), ...cfg });
 
@@ -47,11 +56,14 @@ table('my_profile', { select_permissions: [sel({ id: ME })] });
 table('activities', {
   object_relationships: [objRel('host', 'host_id')],
   array_relationships: [arrRel('rsvps', 'activity_rsvps', 'activity_id')],
-  select_permissions: [sel({ is_active: { _eq: 1 } })],
+  // explicit columns: the generated `geog` column is for the geo index only, not the API
+  select_permissions: [sel({ is_active: { _eq: 1 } }, ['id', 'host_id', 'title', 'description', 'activity_type', 'latitude', 'longitude',
+    'location_name', 'start_time', 'end_time', 'capacity', 'current_attendees', 'gender_filter', 'min_age', 'max_age', 'is_active', 'created_at', 'updated_at'])],
   insert_permissions: [{ role: 'user', permission: {
     check: { _and: [{ host_id: ME }, verifiedHost] }, set: { host_id: X },
     columns: ['title', 'description', 'activity_type', 'latitude', 'longitude', 'location_name', 'start_time', 'end_time', 'capacity', 'gender_filter', 'min_age', 'max_age'] } }],
   delete_permissions: [{ role: 'user', permission: { filter: { host_id: ME } } }],
+  event_triggers: [embedTrigger('activity_embed', ['title', 'description', 'activity_type', 'location_name'])],
 });
 table('activity_rsvps', {
   object_relationships: [objRel('activity', 'activity_id'), objRel('user', 'user_id')],
@@ -104,6 +116,7 @@ table('travel_packages', {
   insert_permissions: [{ role: 'user', permission: { check: ownPackage, columns: ['provider_id', ...pkgCols] } }],
   update_permissions: [{ role: 'user', permission: { columns: [...pkgCols, 'is_active'], filter: ownPackage } }],
   delete_permissions: [{ role: 'user', permission: { filter: ownPackage } }],
+  event_triggers: [embedTrigger('package_embed', ['title', 'description', 'destination', 'category', 'duration_days'])],
 });
 table('travel_packages_detail', {
   select_permissions: [sel({ _or: [{ is_active: { _eq: 1 } }, { provider_user_id: ME }] })],
@@ -132,7 +145,7 @@ table('wave_requests', {
     name: 'wave_request_created',
     definition: { enable_manual: false, insert: { columns: '*' } },
     retry_conf: { num_retries: 3, interval_sec: 10, timeout_sec: 60 },
-    webhook: `${ACTIONS_URL}/events/wave-request`,
+    webhook: `${API_URL}/events/wave-request`,
   }],
 });
 table('wave_feed', { select_permissions: [sel({ _or: [{ status: { _eq: 'active' } }, { host_id: ME }] })] });
@@ -192,7 +205,7 @@ table('user_reports', {
 // --- SQL functions exposed as queries (STABLE) / mutations (VOLATILE) ---
 const withSession = ['my_pins', 'rsvp_activity', 'cancel_rsvp', 'create_booking', 'update_booking_status', 'cancel_booking',
   'get_or_create_provider', 'book_travel_package', 'update_package_booking_status', 'join_wave', 'process_wave_request',
-  'cancel_wave_member', 'create_trip_group', 'add_group_member', 'join_group_by_code', 'regenerate_group_invite', 'add_expense', 'delete_expense', 'record_settlement', 'get_or_create_group_chat', 'verify_email_otp', 'submit_aadhaar'];
+  'cancel_wave_member', 'create_trip_group', 'add_group_member', 'join_group_by_code', 'regenerate_group_invite', 'add_expense', 'delete_expense', 'record_settlement', 'get_or_create_group_chat', 'submit_aadhaar'];
 const plain = ['nearby_activities', 'nearby_recommendations', 'search_listings', 'search_packages'];
 const functions = [
   ...withSession.map((name) => ({ function: T(name), configuration: { session_argument: 'hasura_session' }, permissions: [{ role: 'user' }] })),
@@ -202,13 +215,14 @@ const functions = [
 // --- Actions: things that need the outside world (email, SMS) ---
 const actions = [
   { name: 'sendEmailOtp', args: [], out: 'MessageOutput' },
+  { name: 'verifyEmailOtp', args: [{ name: 'code', type: 'String!' }], out: 'MessageOutput' },
   { name: 'sendPhoneOtp', args: [{ name: 'phone', type: 'String!' }], out: 'MessageOutput' },
   { name: 'verifyPhoneOtp', args: [{ name: 'phone', type: 'String!' }, { name: 'code', type: 'String!' }], out: 'MessageOutput' },
   { name: 'groupInvitePreview', args: [{ name: 'code', type: 'String!' }], out: 'GroupInvite' },
   { name: 'triggerSos', args: [{ name: 'latitude', type: 'Float!' }, { name: 'longitude', type: 'Float!' }, { name: 'message', type: 'String' }], out: 'MessageOutput' },
 ].map((a) => ({
   name: a.name,
-  definition: { kind: 'synchronous', type: 'mutation', handler: `${ACTIONS_URL}/actions`, arguments: a.args, output_type: a.out, forward_client_headers: false },
+  definition: { kind: 'synchronous', type: 'mutation', handler: `${API_URL}/actions`, arguments: a.args, output_type: a.out, forward_client_headers: false },
   permissions: [{ role: 'user' }],
 }));
 

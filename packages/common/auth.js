@@ -11,13 +11,15 @@ const verifyBearer = async (header) => {
   try {
     user = jwt.verify(token, process.env.JWT_SECRET);
   } catch (e) {
-    throw { status: 403, message: 'Invalid or expired token' };
+    throw { status: 401, message: 'Invalid or expired token' };
   }
+  let revoked;
   try {
-    if (user.jti && await redis.exists(`bl:${user.jti}`)) throw { status: 401, message: 'Token revoked' };
+    revoked = await redis.exists(`bl:${user.jti}`);
   } catch (e) {
-    if (e.status) throw e; // Redis down: fail open, the signature was still verified
+    throw { status: 503, message: 'Auth temporarily unavailable' }; // Redis down: fail closed, can't rule out a logout
   }
+  if (revoked) throw { status: 401, message: 'Token revoked' };
   return user;
 };
 

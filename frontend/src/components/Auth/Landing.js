@@ -56,7 +56,7 @@ const MapArt = () => (
     <path d="M262 286 L346 296" stroke="var(--amber)" strokeWidth="6" strokeLinecap="round" />
     <g stroke="var(--amber)" strokeWidth="1.5" opacity=".7"><path d="M274 287 L274 272 M292 289 L292 270 M310 291 L310 272 M328 293 L328 274" /></g>
     {/* labels */}
-    <g fill="rgba(255,255,255,.55)" fontFamily="DM Sans, sans-serif" fontSize="14" fontWeight="600" letterSpacing=".04em">
+    <g fill="rgba(255,255,255,.55)" fontFamily="var(--font-body)" fontSize="14" fontWeight="600" letterSpacing=".04em">
       <text x="120" y="102">TAPOVAN</text><text x="352" y="322">Laxman Jhula</text>
       <text x="410" y="570">Ram Jhula</text><text x="228" y="220" transform="rotate(84 228 220)" fill="rgba(255,255,255,.4)">GANGA</text>
     </g>

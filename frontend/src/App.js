@@ -5,6 +5,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 're
 import Landing from './components/Auth/Landing';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
+import { ForgotPassword, ResetPassword } from './components/Auth/Recover';
 import MapView from './components/Map/MapView';
 import ActivityDetails from './components/Activities/ActivityDetails';
 import CreateActivity from './components/Activities/CreateActivity';
@@ -18,10 +19,11 @@ import Groups from './components/Groups/Groups';
 import GroupDetail from './components/Groups/GroupDetail';
 import JoinGroup from './components/Groups/JoinGroup';
 import WaveDashboard from './components/Waves/WaveDashboard';
+import Itinerary from './components/Itinerary/Itinerary';
 import Navbar from './components/Layout/Navbar';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { authAPI, usersAPI } from './utils/api';
+import { authAPI, usersAPI, setToken, refreshSession } from './utils/api';
 
 // Fade-in wrapper; also gives every screen the shared page gutter
 // Logged-out visitors opening an invite link: remember it, sign in, then land on the join page
@@ -44,14 +46,15 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Restore the session from the refresh cookie; the cached profile fills in fields the slim login payload lacks
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      setUser(JSON.parse(userData));
-    }
-    setLoading(false);
+    refreshSession()
+      .then(({ user: fresh }) => {
+        const saved = JSON.parse(localStorage.getItem('user') || 'null');
+        setUser(saved?.id === fresh.id ? { ...saved, ...fresh } : fresh);
+      })
+      .catch(() => localStorage.removeItem('user'))
+      .finally(() => setLoading(false));
   }, []);
 
   // The login payload is slim; pull the full profile (verification flags etc.) so gated screens know the user's state
@@ -74,14 +77,14 @@ function App() {
   }, [user, navigate]);
 
   const handleLogin = (userData, token) => {
-    localStorage.setItem('token', token);
+    setToken(token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
   };
 
   const handleLogout = () => {
-    authAPI.logout().catch(() => {}); // revoke the token server-side (Redis blacklist)
-    localStorage.removeItem('token');
+    authAPI.logout().catch(() => {}); // revoke the session server-side (refresh token + Redis blacklist)
+    setToken(null);
     localStorage.removeItem('user');
     setUser(null);
   };
@@ -115,6 +118,8 @@ function App() {
               path="/register" 
               element={!user ? <Register onLogin={handleLogin} /> : <Navigate to={defaultRoute} />} 
             />
+            <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to={defaultRoute} />} />
+            <Route path="/reset-password" element={!user ? <ResetPassword /> : <Navigate to={defaultRoute} />} />
 
             {/* Traveler routes */}
             <Route 
@@ -144,6 +149,10 @@ function App() {
             <Route 
               path="/packages" 
               element={user ? <PageWrapper><TravelPackages user={user} userLocation={userLocation} /></PageWrapper> : <Navigate to="/welcome" />} 
+            />
+            <Route 
+              path="/itinerary" 
+              element={user ? <PageWrapper><Itinerary /></PageWrapper> : <Navigate to="/welcome" />} 
             />
             <Route 
               path="/groups" 

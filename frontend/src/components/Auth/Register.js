@@ -42,7 +42,7 @@ function Register({ onLogin }) {
     e.preventDefault();
     setError('');
     if (formData.password !== formData.confirmPassword) return setError('Passwords do not match');
-    if (formData.password.length < 6) return setError('Password must be at least 6 characters');
+    if (formData.password.length < 8) return setError('Password must be at least 8 characters');
 
     setLoading(true);
     try {
@@ -78,7 +78,7 @@ function Register({ onLogin }) {
             <span style={{ width: 44 }} />
           </div>
           <h1>Create your account</h1>
-          <p className="sub">Free forever. Verify later, when you want to host.</p>
+          <p className="sub">Free forever. We'll email you a code to verify your address.</p>
 
           {error && <div className="alert" role="alert"><CircleAlert size={18} />{error}</div>}
 
@@ -110,7 +110,7 @@ function Register({ onLogin }) {
           </div>
 
           <div className="grid-2">
-            {input('password', 'Password', { type: 'password', placeholder: 'Min 6 characters', autoComplete: 'new-password' })}
+            {input('password', 'Password', { type: 'password', placeholder: 'Min 8 characters', autoComplete: 'new-password' })}
             {input('confirmPassword', 'Confirm', { type: 'password', placeholder: 'Repeat password', autoComplete: 'new-password' })}
           </div>
 
